@@ -14,11 +14,20 @@ class Mutations:
         self.mutations: dict[dict[int: list]] = {}
 
     def test(self):
-        print("test")
+        return "test"
+    
+    def get_seq_index_by_id(self, id: str) -> str:
+        """ Get a sequence from the alignment by its id """
+
+        for sequence in self.alignment:
+            if sequence.id == id:
+                return str(sequence)
+        
+        raise ValueError(f"Could not find sequence with id {id}")
 
     @staticmethod
     def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, apobec: bool=False, g_to_a: bool=False) -> dict[int: list]:
-        """ Get mutations from a list of sequences and a reference sequence 
+        """ Get mutations from a a sequence and a reference sequence 
         returns a dictionary of mutations where the key is the position of the mutation and the value is a list of types of mutations """
 
         if type(sequence) is Seq:
@@ -38,12 +47,12 @@ class Mutations:
         if len(sequence) != len(reference):
             raise ValueError("Reference and sequence must be the same length")
         
-        return Mutations.get_mutations_cached(sequence=sequence, reference=reference, apobec=apobec, g_to_a=g_to_a)
+        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, apobec=apobec, g_to_a=g_to_a)
         
 
     @cache
     @staticmethod
-    def get_mutations_cached(*, sequence: str, reference: str, apobec: bool, g_to_a: bool) -> dict[int: list]:
+    def get_mutations_from_str(*, sequence: str, reference: str, apobec: bool, g_to_a: bool) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence
         separated out so it can be cached (Seq and SeqRecord are not hashable) """
 
