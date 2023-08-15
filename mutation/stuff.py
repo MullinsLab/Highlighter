@@ -3,8 +3,23 @@ import mutations
 from Bio import AlignIO
 from Bio.Align import AlignInfo
 
-align = AlignIO.read('mutation/Tests/Mutation/test.fasta', 'fasta')
-print(align[0].id)
+from Bio.Graphics import MutationPlot
+
+align = AlignIO.read('mutation/Tests/Mutation/highlighter.fasta', 'fasta')
 mutations = AlignInfo.Mutations(align)
+mutation_plot = MutationPlot(align)
+mutation_plot.draw("test.svg")
+
+# print(mutations.list_mutations(apobec=False, g_to_a=False))
+# print(mutations.list_mutations(apobec=True, g_to_a=False))
+# print(mutations.list_mutations(apobec=False, g_to_a=True))
+# print(mutations.list_mutations(apobec=True, g_to_a=True))
+
+# print(mutations.list_mutations(reference=1, apobec=False, g_to_a=False))
+# print(mutations.list_mutations(reference=1, apobec=True, g_to_a=False))
+# print(mutations.list_mutations(reference=1, apobec=False, g_to_a=True))
+# print(mutations.list_mutations(reference=1, apobec=True, g_to_a=True))
+
+
 
 print("done")
