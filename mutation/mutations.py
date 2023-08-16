@@ -144,9 +144,9 @@ class MutationPlot:
             else:
                 raise TypeError("tree must be a Bio.Phylo.BaseTree.Tree object (or a derivative)")
 
-        self.mutations = AlignInfo.Mutations(alignment)
-        self.seq_count = len(alignment)
-        self.seq_length = len(alignment[0])
+        self._mutations = AlignInfo.Mutations(alignment)
+        self._seq_count = len(alignment)
+        self._seq_length = len(alignment[0])
         self.mark_reference: bool = mark_reference
 
         self.output_format: str = output_format
@@ -161,30 +161,32 @@ class MutationPlot:
         self.title: str = title
         self.title_font: str = title_font
         self.title_font_size: int = title_font_size
-        self.title_height = 0
+        self._title_font_height: float = self._font_height(self.title_font, self.title_font_size)
+        self._title_height = 0
 
         self.ruler: bool = ruler
         self.ruler_font: str = ruler_font
         self.ruler_font_size: int = ruler_font_size
-        self.ruler_height = 0
+        self._ruler_font_height: float = self._font_height(self.ruler_font, self.ruler_font_size)
+        self._ruler_height = 0 if not ruler else self._ruler_font_height * 3
 
-        self.plot_width: float = 14 * inch
-        self.plot_floor: float = self.bottom_margin + self.ruler_height
+        self._plot_width: float = 14 * inch
+        self._plot_floor: float = self.bottom_margin + self._ruler_height
 
-        self.seq_name_width: float = self._max_seq_name_width
-        self.width: float = self.left_margin + self.plot_width + (inch/4) + self.seq_name_width + self.right_margin
+        self._seq_name_width: float = self._max_seq_name_width
+        self._width: float = self.left_margin + self._plot_width + (inch/4) + self._seq_name_width + self.right_margin
         
-        self.seq_height: float = self._font_height(self.seq_name_font, self.seq_name_font_size)
-        self.seq_gap: float = self.seq_height / 5
-        self.height: float = len(self.alignment) * (self.seq_height + self.seq_gap) + self.top_margin + self.bottom_margin + self.title_height + self.ruler_height
+        self._seq_height: float = self._font_height(self.seq_name_font, self.seq_name_font_size)
+        self._seq_gap: float = self._seq_height / 5
+        self._height: float = len(self.alignment) * (self._seq_height + self._seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
 
-        self.plot_colors: dict[str: str] = {"A": "#42FF00", "C": "#41B8EE", "G": "#FFA500", "T": "#EE0B10", "Gap": "#666666"}
+        self._plot_colors: dict[str: str] = {"A": "#42FF00", "C": "#41B8EE", "G": "#FFA500", "T": "#EE0B10", "Gap": "#666666"}
 
     def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, sort: str="similar", narrow_markers: bool=True, min_marker_width: float=1):
         """ Writes out the mutation plot to a file """
         
-        drawing = self.drawing = Drawing(self.width, self.height)
-        self.mutations_list = self.mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a)
+        drawing = self.drawing = Drawing(self._width, self._height)
+        self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a)
         self.narrow_markers: bool = narrow_markers
         self.min_marker_width: float = min_marker_width
 
@@ -200,24 +202,26 @@ class MutationPlot:
         else: 
             sorted_keys = range(len(self.mutations_list))
 
+        self._draw_ruler()
+
         # for seq_index, mutations in enumerate(self.mutations_list):
         for plot_index, seq_index in enumerate(sorted_keys):
             mutations = self.mutations_list[seq_index]
 
             # Add label for sequence
             id = self.alignment[seq_index].id
-            if self.mark_reference and seq_index == self.mutations.reference:
+            if self.mark_reference and seq_index == self._mutations.reference:
                 id += " (r)"
 
-            x: float = self.left_margin + self.plot_width + (inch/4)
-            y: float = ((self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap)) + self.bottom_margin
+            x: float = self.left_margin + self._plot_width + (inch/4)
+            y: float = ((self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap)) + self._plot_floor
             sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
             drawing.add(sequence_str)
 
             # Add base line for sequence
             x1: float = self.left_margin
-            x2: float = self.left_margin + self.plot_width
-            y: float = (self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap) + self.seq_gap + self.bottom_margin
+            x2: float = self.left_margin + self._plot_width
+            y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
             sequence_baseline: Line = Line(x1, y, x2, y, strokeColor=colors.lightgrey)
             drawing.add(sequence_baseline)
 
@@ -230,12 +234,12 @@ class MutationPlot:
 
         for base, mutation in mutations.items():
             for code in mutation:
-                if code in self.plot_colors:
+                if code in self._plot_colors:
                     x1: float = self.left_margin + self._base_left(base)
                     x2: float = self.left_margin + self._base_left(base+1)
 
-                    y1: float = ((self.seq_count-plot_index) * (self.seq_height + self.seq_gap)) + (self.seq_gap/2) + self.bottom_margin
-                    y2: float = ((self.seq_count-(plot_index+1)) * (self.seq_height + self.seq_gap)) + self.seq_gap + self.bottom_margin
+                    y1: float = ((self._seq_count-plot_index) * (self._seq_height + self._seq_gap)) + (self._seq_gap/2) + self._plot_floor
+                    y2: float = ((self._seq_count-(plot_index+1)) * (self._seq_height + self._seq_gap)) + self._seq_gap + self._plot_floor
 
                     if code != "Gap" and self.narrow_markers and x2-x1 > self.min_marker_width:
                         x1, x2 = (
@@ -243,7 +247,7 @@ class MutationPlot:
                             x2-(((x2-x1)-self.min_marker_width)/2)
                         )
 
-                    base_color: Color = self._hex_to_color(self.plot_colors[code])
+                    base_color: Color = self._hex_to_color(self._plot_colors[code])
                     base_mark: Rect = Rect(x1, y1, x2-x1, y2-y1, fillColor=base_color, strokeColor=base_color, strokeWidth=0.1)
                     self.drawing.add(base_mark)
         
@@ -251,27 +255,62 @@ class MutationPlot:
         for base, mutation in mutations.items():
             if "APOBEC" in mutation:
                 x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
-                y: float = (self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap) + self.seq_gap + self.bottom_margin
+                y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
                 
-                circle = Circle(x, y, (self.seq_height/3)/2, fillColor=self._hex_to_color("#FF00FF"), strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=0.1)
+                circle = Circle(x, y, (self._seq_height/3)/2, fillColor=self._hex_to_color("#FF00FF"), strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=0.1)
                 
                 self.drawing.add(circle)
 
             elif "G->A mutation" in mutation:
                 x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
-                y: float = (self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap) + self.seq_gap + self.bottom_margin
+                y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
                 
                 diamond = self._g_to_a_diamond(x, y)
                 
                 self.drawing.add(diamond)
+
+    def _draw_ruler(self) -> None:
+        """ Draw the ruler at the bottom of the plot """
+
+        label_width = stringWidth(str(self._seq_length), self.seq_name_font, self.seq_name_font_size)
+
+        self._ruler_label(0)
+        self._ruler_label(self._seq_length)
+
+        self._ruler_heavy_tick(0)
+        self._ruler_heavy_tick(self._seq_length)
+
+        x1: float = self.left_margin
+        x2: float = self.left_margin + self._plot_width
+        y: float = self.bottom_margin + (self._ruler_font_height * 3)
+
+        ruler_line: Line = Line(x1, y, x2, y, strokeColor=colors.black, strokeWidth=2)
+        self.drawing.add(ruler_line)
+
+    def _ruler_label(self, base: int) -> String:
+        """ Draw a label on the ruler """
+
+        x: float = self.left_margin + self._base_left(base)
+        y: float = self.bottom_margin+self._ruler_font_height
+
+        self.drawing.add(String(x, y, str(base), textAnchor="middle", fontName=self.ruler_font, fontSize=self.ruler_font_size))
+
+    def _ruler_heavy_tick(self, base: int) -> Line:
+        """ Draw a heavy tick on the ruler """
+
+        x: float = self.left_margin + self._base_left(base)
+        y1: float = self.bottom_margin + (self._ruler_font_height * 3)
+        y2: float = self.bottom_margin + (self._ruler_font_height * 2)
+
+        self.drawing.add(Line(x, y1, x, y2, strokeColor=colors.black, strokeWidth=1))
     
     def _base_left(self, base: int) -> float:
         """ Get the left coordinate of a base """
 
-        if base == self.seq_length:
-            return self.plot_width
+        if base == self._seq_length:
+            return self._plot_width
         
-        return (base / self.seq_length) * self.plot_width
+        return (base / self._seq_length) * self._plot_width
     
     @property
     def _max_seq_name_width(self) -> float:
@@ -309,7 +348,7 @@ class MutationPlot:
         """ Draw a rectangle for a G->A mutation """
 
         #diamond = Rect(x-((self.seq_height/3)/2), y-((self.seq_height/3)/2), self.seq_height/3, self.seq_height/3, strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=1)
-        diamond = PolyLine([x, y-((self.seq_height/3)/2), x-((self.seq_height/3)/2), y, x, y+((self.seq_height/3)/2), x+((self.seq_height/3)/2), y, x, y-((self.seq_height/3)/2), x-((self.seq_height/3)/2), y], strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=2)
+        diamond = PolyLine([x, y-((self._seq_height/3)/2), x-((self._seq_height/3)/2), y, x, y+((self._seq_height/3)/2), x+((self._seq_height/3)/2), y, x, y-((self._seq_height/3)/2), x-((self._seq_height/3)/2), y], strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=2)
 
         return diamond
     
