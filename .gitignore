@@ -3,3 +3,6 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
+
+/mutation/Tests/Private/*
+test.svg

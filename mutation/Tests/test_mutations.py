@@ -124,7 +124,8 @@ class MutationObjectTests(unittest.TestCase):
         for reference in [0, 1]:
             for apobec in [False, True]:
                 for g_to_a in [False, True]:
-                    self.assertEqual(self.short_mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a), result[reference][apobec][g_to_a])
+                    with self.subTest(reference=reference, apobec=apobec, g_to_a=g_to_a):
+                        self.assertEqual(self.short_mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a), result[reference][apobec][g_to_a])
 
 
 class MutationPlotTests(unittest.TestCase):
@@ -140,6 +141,12 @@ class MutationPlotTests(unittest.TestCase):
         """ MutationPlot should initialize correctly """
 
         self.assertIs(self.mutation_plot.alignment, self.align)
+
+    def test_mutation_plot_fails_init_with_bad_tree(self):
+        """ MutationPlot should fail to initialize if a bad tree is provided """
+
+        with self.assertRaises(TypeError):
+            MutationPlot(self.align, tree='bad_tree')
 
     # def test_mutation_plot_height_is_18_per_sequence(self):
     #     """ MutationPlot should have a height of 18 per sequence """

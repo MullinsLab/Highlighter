@@ -2,10 +2,11 @@ import string
 
 from functools import cache
 
+import Bio
+from Bio import Graphics, Phylo
 from Bio.Align import AlignInfo
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
-from Bio import Graphics
 
 class Mutations:
     """ Get mutation info from an alignment """
@@ -132,10 +133,17 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, output_format="svg", seq_name_font="Helvetica", seq_name_size=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, mark_reference: bool=True):
+    def __init__(self, alignment, *, tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
+
+        if tree is not None:
+            if isinstance(tree, Bio.Phylo.BaseTree.Tree):
+                self.tree = tree
+            else:
+                raise TypeError("tree must be a Bio.Phylo.BaseTree.Tree object (or a derivative)")
+
         self.mutations = AlignInfo.Mutations(alignment)
         self.seq_count = len(alignment)
         self.seq_length = len(alignment[0])
@@ -143,23 +151,34 @@ class MutationPlot:
 
         self.output_format: str = output_format
         self.seq_name_font: str = seq_name_font
-        self.seq_name_size: int = seq_name_size
+        self.seq_name_font_size: int = seq_name_font_size
 
         self.top_margin: float = inch * top_margin
         self.bottom_margin: float = inch * botom_margin
         self.left_margin: float = inch * left_margin
+        self.right_margin: float = inch * right_margin
+
+        self.title: str = title
+        self.title_font: str = title_font
+        self.title_font_size: int = title_font_size
+        self.title_height = 0
+
+        self.ruler: bool = ruler
+        self.ruler_font: str = ruler_font
+        self.ruler_font_size: int = ruler_font_size
+        self.ruler_height = 0
 
         self.plot_width: float = 14 * inch
+        self.plot_floor: float = self.bottom_margin + self.ruler_height
+
         self.seq_name_width: float = self._max_seq_name_width
-        self.width: float = self.left_margin + self.plot_width + (inch/4) + self.seq_name_width
+        self.width: float = self.left_margin + self.plot_width + (inch/4) + self.seq_name_width + self.right_margin
         
-        self.seq_height: float = self._font_height
+        self.seq_height: float = self._font_height(self.seq_name_font, self.seq_name_font_size)
         self.seq_gap: float = self.seq_height / 5
-        self.height: float = len(self.alignment) * (self.seq_height + self.seq_gap) + self.top_margin + self.bottom_margin
+        self.height: float = len(self.alignment) * (self.seq_height + self.seq_gap) + self.top_margin + self.bottom_margin + self.title_height + self.ruler_height
 
         self.plot_colors: dict[str: str] = {"A": "#42FF00", "C": "#41B8EE", "G": "#FFA500", "T": "#EE0B10", "Gap": "#666666"}
-
-        # self.apobec_circle: Circle = Circle(0, 0, (self.seq_height/3)/2, fillColor=self._hex_to_color("#FF00FF"), strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=0.1)
 
     def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, sort: str="similar", narrow_markers: bool=True, min_marker_width: float=1):
         """ Writes out the mutation plot to a file """
@@ -171,6 +190,13 @@ class MutationPlot:
 
         if sort == "similar":
             sorted_keys = self._sort_similar()
+        
+        elif sort == "tree":
+            if self.tree is None:
+                raise ValueError("Cannot sort by tree if no tree is provided")
+            
+            sorted_keys = self._indexes_by_tree_order()
+
         else: 
             sorted_keys = range(len(self.mutations_list))
 
@@ -185,7 +211,7 @@ class MutationPlot:
 
             x: float = self.left_margin + self.plot_width + (inch/4)
             y: float = ((self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap)) + self.bottom_margin
-            sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_size)
+            sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
             drawing.add(sequence_str)
 
             # Add base line for sequence
@@ -224,7 +250,6 @@ class MutationPlot:
         # APOBEC and G->A go second so they go on top of other elements
         for base, mutation in mutations.items():
             if "APOBEC" in mutation:
-                print(f"Base: {base}, apobec")
                 x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
                 y: float = (self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap) + self.seq_gap + self.bottom_margin
                 
@@ -233,7 +258,6 @@ class MutationPlot:
                 self.drawing.add(circle)
 
             elif "G->A mutation" in mutation:
-                print(f"Base: {base}, G->A")
                 x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
                 y: float = (self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap) + self.seq_gap + self.bottom_margin
                 
@@ -256,18 +280,17 @@ class MutationPlot:
         max_width: float = 0
 
         for sequence in self.alignment:
-            width: float = stringWidth(f"{sequence.id} (r)", self.seq_name_font, self.seq_name_size)
+            width: float = stringWidth(f"{sequence.id} (r)", self.seq_name_font, self.seq_name_font_size)
             if width > max_width:
                 max_width = width
         
         return max_width
     
-    @property
-    def _font_height(self) -> float:
+    def _font_height(self, font, size) -> float:
         """ Get the height of a font """
 
-        _, left, _, right = String(0, 0, string.ascii_letters + string.digits + "_", fontName=self.seq_name_font, fontSize=self.seq_name_size).getBounds()
-        return right - left
+        _, bottom, _, top = String(0, 0, string.ascii_letters + string.digits + "_", fontName=font, fontSize=size).getBounds()
+        return top - bottom
     
     def _hex_to_color(self, hex: str) -> Color:
         """ Convert a hex color to rgb """
@@ -289,5 +312,24 @@ class MutationPlot:
         diamond = PolyLine([x, y-((self.seq_height/3)/2), x-((self.seq_height/3)/2), y, x, y+((self.seq_height/3)/2), x+((self.seq_height/3)/2), y, x, y-((self.seq_height/3)/2), x-((self.seq_height/3)/2), y], strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=2)
 
         return diamond
+    
+    def _get_index_by_id(self, id: str) -> int:
+        """ Get the index of a sequence by its id """
+
+        for index, sequence in enumerate(self.alignment):
+            if sequence.id == id:
+                return index
+        
+        return None
+    
+    def _indexes_by_tree_order(self) -> list[int]:
+        """ Get the indexes of the sequences in the order they appear in the tree """
+
+        indexes: list[int] = []
+
+        for terminal in self.tree.get_terminals():
+            indexes.append(self._get_index_by_id(terminal.name))
+
+        return indexes
 
 Graphics.MutationPlot = MutationPlot
