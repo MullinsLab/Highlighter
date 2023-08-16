@@ -123,7 +123,7 @@ from reportlab.lib.units import inch
 
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-from reportlab.graphics.shapes import Drawing, String, Line, Rect
+from reportlab.graphics.shapes import Drawing, String, Line, Rect, Circle, PolyLine
 
 from Bio.Graphics import _write
 from Bio.Align import AlignInfo
@@ -139,7 +139,7 @@ class MutationPlot:
         self.mutations = AlignInfo.Mutations(alignment)
         self.seq_count = len(alignment)
         self.seq_length = len(alignment[0])
-        self.mark_reference = mark_reference
+        self.mark_reference: bool = mark_reference
 
         self.output_format: str = output_format
         self.seq_name_font: str = seq_name_font
@@ -149,7 +149,7 @@ class MutationPlot:
         self.bottom_margin: float = inch * botom_margin
         self.left_margin: float = inch * left_margin
 
-        self.plot_width: float = 7 * inch
+        self.plot_width: float = 14 * inch
         self.seq_name_width: float = self._max_seq_name_width
         self.width: float = self.left_margin + self.plot_width + (inch/4) + self.seq_name_width
         
@@ -159,11 +159,15 @@ class MutationPlot:
 
         self.plot_colors: dict[str: str] = {"A": "#42FF00", "C": "#41B8EE", "G": "#FFA500", "T": "#EE0B10", "Gap": "#666666"}
 
-    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, sort: str="similar"):
+        # self.apobec_circle: Circle = Circle(0, 0, (self.seq_height/3)/2, fillColor=self._hex_to_color("#FF00FF"), strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=0.1)
+
+    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, sort: str="similar", narrow_markers: bool=True, min_marker_width: float=1):
         """ Writes out the mutation plot to a file """
         
         drawing = self.drawing = Drawing(self.width, self.height)
         self.mutations_list = self.mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a)
+        self.narrow_markers: bool = narrow_markers
+        self.min_marker_width: float = min_marker_width
 
         if sort == "similar":
             sorted_keys = self._sort_similar()
@@ -200,22 +204,42 @@ class MutationPlot:
 
         for base, mutation in mutations.items():
             for code in mutation:
-                 if code in self.plot_colors:
-                    x1, y1, x2, y2 = self._base_box(plot_index, base)
+                if code in self.plot_colors:
+                    x1: float = self.left_margin + self._base_left(base)
+                    x2: float = self.left_margin + self._base_left(base+1)
+
+                    y1: float = ((self.seq_count-plot_index) * (self.seq_height + self.seq_gap)) + (self.seq_gap/2) + self.bottom_margin
+                    y2: float = ((self.seq_count-(plot_index+1)) * (self.seq_height + self.seq_gap)) + self.seq_gap + self.bottom_margin
+
+                    if code != "Gap" and self.narrow_markers and x2-x1 > self.min_marker_width:
+                        x1, x2 = (
+                            x1+(((x2-x1)-self.min_marker_width)/2), 
+                            x2-(((x2-x1)-self.min_marker_width)/2)
+                        )
+
                     base_color: Color = self._hex_to_color(self.plot_colors[code])
-                    base_mark: Rect = Rect(x1, y1, x2-x1, y2-y1,fillColor=base_color, strokeColor=base_color)
+                    base_mark: Rect = Rect(x1, y1, x2-x1, y2-y1, fillColor=base_color, strokeColor=base_color, strokeWidth=0.1)
                     self.drawing.add(base_mark)
+        
+        # APOBEC and G->A go second so they go on top of other elements
+        for base, mutation in mutations.items():
+            if "APOBEC" in mutation:
+                print(f"Base: {base}, apobec")
+                x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
+                y: float = (self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap) + self.seq_gap + self.bottom_margin
+                
+                circle = Circle(x, y, (self.seq_height/3)/2, fillColor=self._hex_to_color("#FF00FF"), strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=0.1)
+                
+                self.drawing.add(circle)
 
-    def _base_box(self, plot_index: int, base: int) -> tuple[float, float, float, float]:
-        """ Get the coordinates of a base """
-
-        x1: float = self.left_margin + self._base_left(base)
-        x2: float = self.left_margin + self._base_left(base+1)
-
-        y1: float = ((self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap)) + self.bottom_margin
-        y2: float = ((self.seq_count-((plot_index-1) + .5)) * (self.seq_height + self.seq_gap)) + self.bottom_margin
-
-        return (x1, y1, x2, y2)
+            elif "G->A mutation" in mutation:
+                print(f"Base: {base}, G->A")
+                x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
+                y: float = (self.seq_count-(plot_index + .5)) * (self.seq_height + self.seq_gap) + self.seq_gap + self.bottom_margin
+                
+                diamond = self._g_to_a_diamond(x, y)
+                
+                self.drawing.add(diamond)
     
     def _base_left(self, base: int) -> float:
         """ Get the left coordinate of a base """
@@ -257,5 +281,13 @@ class MutationPlot:
         returns list of indexes"""
 
         return sorted(range(len(self.mutations_list)), key=lambda x: len(self.mutations_list[x]))
+    
+    def _g_to_a_diamond(self, x: float, y: float) -> Rect:
+        """ Draw a rectangle for a G->A mutation """
+
+        #diamond = Rect(x-((self.seq_height/3)/2), y-((self.seq_height/3)/2), self.seq_height/3, self.seq_height/3, strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=1)
+        diamond = PolyLine([x, y-((self.seq_height/3)/2), x-((self.seq_height/3)/2), y, x, y+((self.seq_height/3)/2), x+((self.seq_height/3)/2), y, x, y-((self.seq_height/3)/2), x-((self.seq_height/3)/2), y], strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=2)
+
+        return diamond
 
 Graphics.MutationPlot = MutationPlot
