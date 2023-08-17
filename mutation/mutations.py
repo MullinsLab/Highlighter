@@ -1,4 +1,4 @@
-import string
+import string, math
 
 from functools import cache
 
@@ -133,7 +133,7 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15):
+    def __init__(self, alignment, *, tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15, ruler_major_ticks: int=10, ruler_minor_ticks=3):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
@@ -167,6 +167,8 @@ class MutationPlot:
         self.ruler: bool = ruler
         self.ruler_font: str = ruler_font
         self.ruler_font_size: int = ruler_font_size
+        self.ruler_major_ticks: int = ruler_major_ticks
+        self.ruler_minor_ticks: int = ruler_minor_ticks
         self._ruler_font_height: float = self._font_height(self.ruler_font, self.ruler_font_size)
         self._ruler_height = 0 if not ruler else self._ruler_font_height * 3
 
@@ -273,13 +275,24 @@ class MutationPlot:
         """ Draw the ruler at the bottom of the plot """
 
         label_width = stringWidth(str(self._seq_length), self.seq_name_font, self.seq_name_font_size)
+        marks: list = []
 
-        self._ruler_label(0)
-        self._ruler_label(self._seq_length)
+        if self._seq_length <= 20:
+            self._ruler_marks(range(self._seq_length))
+        else:
+            bases = [0]
+            last_base: int = self.significant_digits(self._seq_length)-1
+            
+            dist = last_base / self.ruler_major_ticks
 
-        self._ruler_heavy_tick(0)
-        self._ruler_heavy_tick(self._seq_length)
+            for base in range(1, self.ruler_major_ticks+1):
+                bases.append(int(base * dist))
 
+            bases.append(last_base)
+
+            self._ruler_marks(bases)
+
+        # Draw vertical line
         x1: float = self.left_margin
         x2: float = self.left_margin + self._plot_width
         y: float = self.bottom_margin + (self._ruler_font_height * 3)
@@ -287,23 +300,58 @@ class MutationPlot:
         ruler_line: Line = Line(x1, y, x2, y, strokeColor=colors.black, strokeWidth=2)
         self.drawing.add(ruler_line)
 
-    def _ruler_label(self, base: int) -> String:
-        """ Draw a label on the ruler """
+    def _ruler_marks(self, marked_bases: list) -> None:
+        """ Draw marks on the ruler """
 
-        x: float = self.left_margin + self._base_left(base)
+        mark_locations: list = []
+
+        for index, base in enumerate(marked_bases):
+                mark_locations.append(self._ruler_label(base))
+                self._ruler_heavy_tick(base)
+
+                if index:
+                    spacing = (mark_locations[index][0] - mark_locations[index-1][0]) / (self.ruler_minor_ticks+1)
+                    left = mark_locations[index-1][0]
+
+                    for tick in range(1, self.ruler_minor_ticks+1):
+                        self._ruler_light_tick(left + (tick * spacing))
+                    
+
+    def _ruler_label(self, base: int) -> tuple[float]:
+        """ Draw a label on the ruler
+         returns the coordinates of the label """
+
+        x: float = self.left_margin + self._base_center(base)
         y: float = self.bottom_margin+self._ruler_font_height
 
-        self.drawing.add(String(x, y, str(base), textAnchor="middle", fontName=self.ruler_font, fontSize=self.ruler_font_size))
+        self.drawing.add(String(x, y, str(base + 1), textAnchor="middle", fontName=self.ruler_font, fontSize=self.ruler_font_size))
 
-    def _ruler_heavy_tick(self, base: int) -> Line:
-        """ Draw a heavy tick on the ruler """
+        return (x, y)
 
-        x: float = self.left_margin + self._base_left(base)
-        y1: float = self.bottom_margin + (self._ruler_font_height * 3)
-        y2: float = self.bottom_margin + (self._ruler_font_height * 2)
+    def _ruler_heavy_tick(self, base: int) -> tuple[float]:
+        """ Draw a heavy tick on the ruler
+        returns the x, top, and bottom of the tick """
 
-        self.drawing.add(Line(x, y1, x, y2, strokeColor=colors.black, strokeWidth=1))
-    
+        x: float = self.left_margin + self._base_center(base)
+        top: float = self.bottom_margin + (self._ruler_font_height * 3)
+        bottom: float = self.bottom_margin + (self._ruler_font_height * 2)
+
+        self.drawing.add(Line(x, top, x, bottom, strokeColor=colors.black, strokeWidth=1))
+
+        return (x, top, bottom)
+
+    def _ruler_light_tick(self, x: float) -> tuple[float]:
+        """ Draw a light tick on the ruler 
+        x is the raw x, including the _left_margin
+        returns the x, top, and bottom of the tick"""
+
+        top: float = self.bottom_margin + (self._ruler_font_height * 3)
+        bottom: float = self.bottom_margin + (self._ruler_font_height * 2.5)
+
+        self.drawing.add(Line(x, top, x, bottom, strokeColor=colors.black, strokeWidth=1))
+
+        return (x, top, bottom)
+
     def _base_left(self, base: int) -> float:
         """ Get the left coordinate of a base """
 
@@ -311,6 +359,14 @@ class MutationPlot:
             return self._plot_width
         
         return (base / self._seq_length) * self._plot_width
+    
+    def _base_center(self, base: int) -> float:
+        """ Get the center coordinate of a base """
+
+        left_x: float = self._base_left(base)
+        right_x: float = self._base_left(base + 1)
+
+        return left_x + ((right_x-left_x)/2)
     
     @property
     def _max_seq_name_width(self) -> float:
@@ -347,7 +403,6 @@ class MutationPlot:
     def _g_to_a_diamond(self, x: float, y: float) -> Rect:
         """ Draw a rectangle for a G->A mutation """
 
-        #diamond = Rect(x-((self.seq_height/3)/2), y-((self.seq_height/3)/2), self.seq_height/3, self.seq_height/3, strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=1)
         diamond = PolyLine([x, y-((self._seq_height/3)/2), x-((self._seq_height/3)/2), y, x, y+((self._seq_height/3)/2), x+((self._seq_height/3)/2), y, x, y-((self._seq_height/3)/2), x-((self._seq_height/3)/2), y], strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=2)
 
         return diamond
@@ -370,5 +425,23 @@ class MutationPlot:
             indexes.append(self._get_index_by_id(terminal.name))
 
         return indexes
+    
+    @staticmethod
+    def significant_digits(value: float, digits: int=2) -> float:
+        """ Round a number to a certain number of significant digits """
+
+        if value == 0:
+            return 0
+
+        if value > 0:
+            value_str = str(value)
+            value_len = len(value_str)
+
+            if value_len > digits:
+                return(int(value_str[:digits] + "0" * (value_len-digits)))
+            else:
+                return value
+
+        return value
 
 Graphics.MutationPlot = MutationPlot

@@ -6,16 +6,20 @@ from Bio.Align import AlignInfo
 from Bio.Phylo import NexusIO, BaseTree
 from Bio.Graphics import MutationPlot
 
-# align = AlignIO.read('mutation/Tests/Mutation/highlighter.fasta', 'fasta')
+align = AlignIO.read('mutation/Tests/Mutation/highlighter.fasta', 'fasta')
 # align = AlignIO.read('mutation/Tests/Mutation/short_test.fasta', 'fasta')
+mutations = AlignInfo.Mutations(align)
+
+mutation_plot = MutationPlot(align)
+mutation_plot.draw("test.svg", apobec=True, g_to_a=True, narrow_markers=True)
+
+exit()
 
 # V704
 align = AlignIO.read("mutation/Tests/Private/thing.fasta", "fasta")
 tree = Phylo.read("mutation/Tests/Private/thing.nexus.tre", "nexus")
 
-# mutations = AlignInfo.Mutations(align)
-
-mutation_plot = MutationPlot(align, tree=tree)
+mutation_plot = MutationPlot(align, tree=tree, ruler_major_ticks=7)
 mutation_plot.draw("test.svg", apobec=True, g_to_a=True, narrow_markers=True, sort="tree")
 
 # print(mutations.list_mutations(apobec=False, g_to_a=False))
