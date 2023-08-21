@@ -13,68 +13,74 @@ from Bio.Graphics import MutationPlot
 class MutationStaticTests(unittest.TestCase):
     """ Test the static methods of the mutation object """
 
+    def test_get_mutations_error_if_no_type_given(self):
+        """ get_mutations should error if no type is provided """
+
+        with self.assertRaises(ValueError):
+            AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGC')
+
     def test_get_mutations_error_if_no_sequence(self):
         """ get_mutations should error if no sequence is provided """
 
         with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_mutations(reference='ATGC')
+            AlignInfo.Mutations.get_mutations(reference='ATGC', type='NT')
 
     def test_get_mutations_error_if_no_reference(self):
         """ get_mutations should error if no reference is provided """
 
         with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_mutations(sequence='ATGC')
+            AlignInfo.Mutations.get_mutations(sequence='ATGC', type='NT')
 
     def test_get_mutations_error_if_bad_types(self):
         """ get_mutations should error if bad types are provided """
 
         with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_mutations(sequence=1, reference='ATGC')
+            AlignInfo.Mutations.get_mutations(sequence=1, reference='ATGC', type='NT')
 
         with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_mutations(sequence='ATGC', reference=[])
+            AlignInfo.Mutations.get_mutations(sequence='ATGC', reference=[], type='NT')
 
     def test_get_mutations_error_if_different_lengths(self):
         """ get_mutations should error if the sequence and reference are different lengths """
 
         with self.assertRaises(ValueError):
-            AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATG')
+            AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATG', type='NT')
 
     def test_get_mutations_succeeds_with_mixed_types(self):
         """ get_mutations should succeed with mixed types """
 
         try:
-            AlignInfo.Mutations.get_mutations(sequence='ATGC', reference=Seq('ATGC'))
+            AlignInfo.Mutations.get_mutations(sequence='ATGC', reference=Seq('ATGC'), type='NT')
         except:
             self.fail('get_mutations failed with mixed types')
 
         try:
-            AlignInfo.Mutations.get_mutations(sequence=SeqRecord(Seq('ATGC')), reference='ATGC')
+            AlignInfo.Mutations.get_mutations(sequence=SeqRecord(Seq('ATGC')), reference='ATGC', type='NT')
         except:
             self.fail('get_mutations failed with mixed types')
 
     def test_get_mutations_returns_dict(self):
         """ get_mutations should return a dictionary """
 
-        self.assertEqual(type(AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGC')), dict)
+        self.assertEqual(type(AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGC', type='NT')), dict)
 
     def test_get_mutations_returns_empty_dict_given_same_sequence_and_reference(self):
         """ get_mutations should return an empty dictionary if the sequence and reference are the same """
 
-        self.assertEqual(AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGC'), {})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGC', type='NT'), {})
 
     def test_get_mutations_returns_non_empty_dict_given_different_sequence_and_reference(self):
         """ get_mutations should return a non-empty dictionary if the sequence and reference are different """
 
-        self.assertNotEqual(AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGG'), {})
+        self.assertNotEqual(AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGG', type='NT'), {})
 
     def test_get_mutations_returns_correct_dict_given_different_sequence_and_reference(self):
         """ get_mutations should return a dictionary with the correct keys and values """
 
-        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GTGCGGC-', sequence='AATGCA-T'), {0: ['A'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
-        self.assertEqual(AlignInfo.Mutations.get_mutations(g_to_a=True, reference='GTGCGGC-', sequence='AATGCA-T'), {0: ['A', 'G->A mutation'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
-        self.assertEqual(AlignInfo.Mutations.get_mutations(apobec=True, reference='GTGCGGC-', sequence='AATGCA-T'), {0: ['A', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
-        self.assertEqual(AlignInfo.Mutations.get_mutations(g_to_a=True, apobec=True, reference='GTGCGGC-', sequence='AATGCA-T'), {0: ['A', 'G->A mutation', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GTGCGGC-', sequence='AATGCA-T', type='NT'), {0: ['A'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(g_to_a=True, reference='GTGCGGC-', sequence='AATGCA-T', type='NT'), {0: ['A', 'G->A mutation'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(apobec=True, reference='GTGCGGC-', sequence='AATGCA-T', type='NT'), {0: ['A', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(g_to_a=True, apobec=True, reference='GTGCGGC-', sequence='AATGCA-T', type='NT'), {0: ['A', 'G->A mutation', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
 
 
 class MutationObjectTests(unittest.TestCase):
@@ -84,7 +90,7 @@ class MutationObjectTests(unittest.TestCase):
         """ Set up an align object to use for testing """
 
         self.short_align = AlignIO.read(pathlib.PurePath(pathlib.Path(__file__).parent.resolve(), 'Mutation/short_test.fasta'), 'fasta')
-        self.short_mutations = AlignInfo.Mutations(self.short_align)
+        self.short_mutations = AlignInfo.Mutations(self.short_align, type='NT')
 
     def test_list_mutations_raises_error_on_bad_reference(self):
         """ list_mutations should raise an error if the reference is not in the alignment """
@@ -128,6 +134,22 @@ class MutationObjectTests(unittest.TestCase):
                         self.assertEqual(self.short_mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a), result[reference][apobec][g_to_a])
 
 
+class MutationPlotStateicTests(unittest.TestCase):
+    """ Tests that use the static methods of the MutationPlot class """
+
+    def test_mutation_plot_guesses_alignment_type_correctly(self):
+        """ MutationPlot guesses the alignment type correctly """
+
+        self.assertEqual(MutationPlot.guess_alignment_type(AlignIO.read('mutation/Tests/Mutation/highlighter.fasta', 'fasta')), 'NT')
+        self.assertEqual(MutationPlot.guess_alignment_type(AlignIO.read('mutation/Tests/Mutation/highlighter_aa.fasta', 'fasta')), 'AA')
+
+    def test_mutation_plot_significant_digits(self):
+        """ MutationPlot significant_digits returns correctly """
+
+        self.assertEqual(MutationPlot.significant_digits(1234), 1200)
+        self.assertEqual(MutationPlot.significant_digits(51234), 51000)
+
+
 class MutationPlotTests(unittest.TestCase):
     """ Holds test of the MutationPlot class """
 
@@ -147,11 +169,6 @@ class MutationPlotTests(unittest.TestCase):
 
         with self.assertRaises(TypeError):
             MutationPlot(self.align, tree='bad_tree')
-
-    def test_mutation_plot_significant_digits(self):
-        """ MutationPlot significant_digits returns correctly """
-
-        self.assertEqual(MutationPlot.significant_digits(1234), 1200)
 
     # def test_mutation_plot_height_is_18_per_sequence(self):
     #     """ MutationPlot should have a height of 18 per sequence """

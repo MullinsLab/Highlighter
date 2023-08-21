@@ -11,10 +11,16 @@ from Bio.SeqRecord import SeqRecord
 class Mutations:
     """ Get mutation info from an alignment """
 
-    def __init__(self, alignment):
+    def __init__(self, alignment, *, type: str=None):
         """ Initialize the Mutations object """
 
         self.alignment = alignment
+
+        if type not in ("NT", "AA"):
+            raise ValueError("type must be provided (either 'NT' or 'AA')")
+        else:
+            self.type = type
+
         self.mutations: dict[dict[int: list]] = {}
         self.reference: int = 0
 
@@ -49,7 +55,7 @@ class Mutations:
             elif isinstance(sequence, str):
                 sequence_str = sequence
 
-            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, apobec=apobec, g_to_a=g_to_a))
+            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, type=self.type, apobec=apobec, g_to_a=g_to_a))
 
         return mutations
         
@@ -63,34 +69,40 @@ class Mutations:
         raise IndexError(f"Could not find sequence with id {id}")
 
     @staticmethod
-    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, apobec: bool=False, g_to_a: bool=False) -> dict[int: list]:
+    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False) -> dict[int: list]:
         """ Get mutations from a a sequence and a reference sequence 
         returns a dictionary of mutations where the key is the position of the mutation and the value is a list of types of mutations """
 
-        if type(sequence) is Seq:
+        if type not in ("NT", "AA"):
+            raise ValueError("type must be provided (either 'NT' or 'AA')")
+
+        if isinstance(sequence, Seq):
                 sequence = str(sequence)
-        elif type(sequence) is  SeqRecord:
+        elif isinstance(sequence, SeqRecord):
                 sequence = str(sequence.seq)
-        elif type(sequence) is not str:
+        elif not isinstance(sequence, str):
                 raise TypeError(f"Expected sequence to be a string, Seq, or SeqRecord, got {type(sequence)}")
 
-        if type(reference) is Seq:
+        if isinstance(reference, Seq):
                 reference = str(reference)
-        elif type(sequence) is  SeqRecord:
+        elif isinstance(reference, SeqRecord):
                 reference = str(reference.seq)
-        elif type(reference) is not str:
+        elif not isinstance(reference, str):
                 raise TypeError(f"Expected reference to be a string, Seq, or SeqRecord, got {type(reference)}")
             
         if len(sequence) != len(reference):
             raise ValueError("Reference and sequence must be the same length")
         
-        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, apobec=apobec, g_to_a=g_to_a)
+        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a)
         
     @cache
     @staticmethod
-    def get_mutations_from_str(*, sequence: str, reference: str, apobec: bool, g_to_a: bool) -> dict[int: list]:
+    def get_mutations_from_str(*, sequence: str, reference: str, type: str=None, apobec: bool, g_to_a: bool) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence
         separated out so it can be cached (Seq and SeqRecord are not hashable) """
+
+        if type not in ("NT", "AA"):
+            raise ValueError("type must be provided (either 'NT' or 'AA')")
 
         mutations: dict = {}
 
@@ -133,18 +145,22 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15, ruler_major_ticks: int=10, ruler_minor_ticks=3):
+    def __init__(self, alignment, *, type: str=None, tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15, ruler_major_ticks: int=10, ruler_minor_ticks=3):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
+        if type not in ("NT", "AA"):
+            self.type = self.guess_alignment_type(alignment)
+        else:
+            self.type = type
 
         if tree is not None:
             if isinstance(tree, Bio.Phylo.BaseTree.Tree):
                 self.tree = tree
             else:
-                raise TypeError("tree must be a Bio.Phylo.BaseTree.Tree object (or a derivative)")
+                raise TypeError("Tree must be a Bio.Phylo.BaseTree.Tree object (or a derivative)")
 
-        self._mutations = AlignInfo.Mutations(alignment)
+        self._mutations = AlignInfo.Mutations(alignment, type=self.type)
         self._seq_count = len(alignment)
         self._seq_length = len(alignment[0])
         self.mark_reference: bool = mark_reference
@@ -162,7 +178,7 @@ class MutationPlot:
         self.title_font: str = title_font
         self.title_font_size: int = title_font_size
         self._title_font_height: float = self._font_height(self.title_font, self.title_font_size)
-        self._title_height = 0
+        self._title_height = 0 if not title else self._title_font_height*2
 
         self.ruler: bool = ruler
         self.ruler_font: str = ruler_font
@@ -182,9 +198,9 @@ class MutationPlot:
         self._seq_gap: float = self._seq_height / 5
         self._height: float = len(self.alignment) * (self._seq_height + self._seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
 
-        self._plot_colors: dict[str: str] = {"A": "#42FF00", "C": "#41B8EE", "G": "#FFA500", "T": "#EE0B10", "Gap": "#666666"}
+        self._plot_colors: dict[str: [dict[str: str]]] = {"NT": {"A": "#42FF00", "C": "#41B8EE", "G": "#FFA500", "T": "#EE0B10", "Gap": "#666666"}}
 
-    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, sort: str="similar", narrow_markers: bool=True, min_marker_width: float=1):
+    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
         """ Writes out the mutation plot to a file """
         
         drawing = self.drawing = Drawing(self._width, self._height)
@@ -204,6 +220,7 @@ class MutationPlot:
         else: 
             sorted_keys = range(len(self.mutations_list))
 
+        self._draw_title()
         self._draw_ruler()
 
         # for seq_index, mutations in enumerate(self.mutations_list):
@@ -218,7 +235,7 @@ class MutationPlot:
             x: float = self.left_margin + self._plot_width + (inch/4)
             y: float = ((self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap)) + self._plot_floor
             sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
-            drawing.add(sequence_str)
+            drawing.add(sequence_str, id)
 
             # Add base line for sequence
             x1: float = self.left_margin
@@ -236,7 +253,7 @@ class MutationPlot:
 
         for base, mutation in mutations.items():
             for code in mutation:
-                if code in self._plot_colors:
+                if code in self._plot_colors[self.type]:
                     x1: float = self.left_margin + self._base_left(base)
                     x2: float = self.left_margin + self._base_left(base+1)
 
@@ -249,7 +266,7 @@ class MutationPlot:
                             x2-(((x2-x1)-self.min_marker_width)/2)
                         )
 
-                    base_color: Color = self._hex_to_color(self._plot_colors[code])
+                    base_color: Color = self._hex_to_color(self._plot_colors[self.type][code])
                     base_mark: Rect = Rect(x1, y1, x2-x1, y2-y1, fillColor=base_color, strokeColor=base_color, strokeWidth=0.1)
                     self.drawing.add(base_mark)
         
@@ -270,6 +287,15 @@ class MutationPlot:
                 diamond = self._g_to_a_diamond(x, y)
                 
                 self.drawing.add(diamond)
+
+    def _draw_title(self) -> None:
+        """ Draw the title at the top of the plot """
+            
+        if self.title:
+            x: float = self.left_margin + (self._plot_width/2)
+            y: float = self._height - self.top_margin - (self._title_font_height/2)
+
+            self.drawing.add(String(x, y, self.title, textAnchor="middle", fontName=self.title_font, fontSize=self.title_font_size))
 
     def _draw_ruler(self) -> None:
         """ Draw the ruler at the bottom of the plot """
@@ -443,5 +469,25 @@ class MutationPlot:
                 return value
 
         return value
+    
+    @staticmethod
+    def guess_alignment_type(alignment) -> str:
+        """ Returns either 'NT' (nucleotide) or 'AA' (amino acid) """
+
+        nt_codes: str = "ACGTUiRYKMSWBDHVN-" # IUPAC nucleotide codes
+
+        for sequence in alignment:
+            if isinstance(sequence, SeqRecord):
+                sequence_str = str(sequence.seq)
+            elif isinstance(sequence, Seq):
+                sequence_str = str(sequence)
+            elif isinstance(sequence, str):
+                sequence_str = sequence
+                
+            for symbol in sequence_str.strip():
+                if symbol not in nt_codes:
+                    return "AA"
+                    
+        return "NT"
 
 Graphics.MutationPlot = MutationPlot
