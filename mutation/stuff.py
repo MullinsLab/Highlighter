@@ -6,6 +6,19 @@ from Bio.Align import AlignInfo
 from Bio.Phylo import NexusIO, BaseTree
 from Bio.Graphics import MutationPlot
 
+# print(AlignInfo.Mutations.get_mutations(reference='GNS-S', sequence='GNS-S', type='AA', glycosylation=True))
+# exit()
+
+align = AlignIO.read('mutation/Tests/Mutation/highlighter_aa.fasta', 'fasta')
+
+mutation_plot = MutationPlot(align, title="Mismatches compared to reference", type="AA")
+mutation_plot.draw("test_aa.svg", apobec=True, glycosylation=False)
+
+exit()
+
+print(AlignInfo.Mutations.get_mutations(reference='MRVMEIRRNYQHL--', sequence='MRAMK-RRNYQHL--', type='AA'))
+exit()
+
 # align = AlignIO.read('mutation/Tests/Mutation/highlighter.fasta', 'fasta')
 # # align = AlignIO.read('mutation/Tests/Mutation/short_test.fasta', 'fasta')
 # mutations = AlignInfo.Mutations(align)

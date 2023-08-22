@@ -24,7 +24,7 @@ class Mutations:
         self.mutations: dict[dict[int: list]] = {}
         self.reference: int = 0
 
-    def list_mutations(self, *, reference: int|str=0, apobec: bool=False, g_to_a: bool=False) -> dict[int: list]:
+    def list_mutations(self, *, reference: int|str=0, apobec: bool=False, g_to_a: bool=False, glycosylation: bool=False) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence """
 
         reference_str: str = ""
@@ -55,7 +55,7 @@ class Mutations:
             elif isinstance(sequence, str):
                 sequence_str = sequence
 
-            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, type=self.type, apobec=apobec, g_to_a=g_to_a))
+            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, type=self.type, apobec=apobec, g_to_a=g_to_a, glycosylation=glycosylation))
 
         return mutations
         
@@ -69,7 +69,7 @@ class Mutations:
         raise IndexError(f"Could not find sequence with id {id}")
 
     @staticmethod
-    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False) -> dict[int: list]:
+    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False, glycosylation: bool=False) -> dict[int: list]:
         """ Get mutations from a a sequence and a reference sequence 
         returns a dictionary of mutations where the key is the position of the mutation and the value is a list of types of mutations """
 
@@ -93,11 +93,11 @@ class Mutations:
         if len(sequence) != len(reference):
             raise ValueError("Reference and sequence must be the same length")
         
-        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a)
+        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a, glycosylation=glycosylation)
         
     @cache
     @staticmethod
-    def get_mutations_from_str(*, sequence: str, reference: str, type: str=None, apobec: bool, g_to_a: bool) -> dict[int: list]:
+    def get_mutations_from_str(*, sequence: str, reference: str, type: str, apobec: bool, g_to_a: bool, glycosylation: bool) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence
         separated out so it can be cached (Seq and SeqRecord are not hashable) """
 
@@ -106,7 +106,7 @@ class Mutations:
 
         mutations: dict = {}
 
-        if sequence == reference:
+        if sequence == reference and type == "NT":
             return mutations
 
         for base_index in range(len(sequence)):
@@ -118,12 +118,30 @@ class Mutations:
                 else:
                     mutations[base_index].append("Gap")
 
-                if reference[base_index] == "G" and sequence[base_index] == "A":
-                    if g_to_a:
-                        mutations[base_index].append("G->A mutation")
+                # APOBEC and G->A mutations only apply to NT sequences
+                if type == "NT":
+                    if reference[base_index] == "G" and sequence[base_index] == "A":
+                        if g_to_a:
+                            mutations[base_index].append("G->A mutation")
 
-                    if apobec and base_index < len(sequence)-3 and sequence[base_index+1] in "AG" and sequence[base_index+2] != "C":
-                        mutations[base_index].append("APOBEC")
+                        if apobec and base_index <= len(sequence)-3 and sequence[base_index+1] in "AG" and sequence[base_index+2] != "C":
+                            mutations[base_index].append("APOBEC")
+
+            # Glycosylation only applies to AA sequences
+            if type == "AA":
+                if glycosylation and sequence[base_index] == "N" and base_index <= len(sequence)-3:
+                    base_snippet: str = ""
+                    snippet_index: int = base_index+1
+
+                    while len(base_snippet) < 2 and snippet_index < len(sequence):
+                        base_snippet += sequence[snippet_index] if sequence[snippet_index] != "-" else ""
+                        snippet_index += 1
+                    
+                    if base_snippet[0] != "P" and base_snippet[1] in "ST":
+                        if base_index not in mutations:
+                            mutations[base_index] = []
+
+                        mutations[base_index].append("Glycosylation")
         
         return mutations
     
@@ -136,7 +154,7 @@ from reportlab.lib.units import inch
 
 from reportlab.pdfbase.pdfmetrics import stringWidth
 
-from reportlab.graphics.shapes import Drawing, String, Line, Rect, Circle, PolyLine
+from reportlab.graphics.shapes import Drawing, String, Line, Rect, Circle, PolyLine, Polygon
 
 from Bio.Graphics import _write
 from Bio.Align import AlignInfo
@@ -145,14 +163,17 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15, ruler_major_ticks: int=10, ruler_minor_ticks=3):
+    def __init__(self, alignment, *, type: str=None, scheme: str="standard", tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15, ruler_major_ticks: int=10, ruler_minor_ticks=3):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
+        
         if type not in ("NT", "AA"):
             self.type = self.guess_alignment_type(alignment)
         else:
             self.type = type
+        
+        self.scheme: str = scheme
 
         if tree is not None:
             if isinstance(tree, Bio.Phylo.BaseTree.Tree):
@@ -198,13 +219,56 @@ class MutationPlot:
         self._seq_gap: float = self._seq_height / 5
         self._height: float = len(self.alignment) * (self._seq_height + self._seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
 
-        self._plot_colors: dict[str: [dict[str: str]]] = {"NT": {"A": "#42FF00", "C": "#41B8EE", "G": "#FFA500", "T": "#EE0B10", "Gap": "#666666"}}
+        self._plot_colors: dict[str: [dict[str: str]]] = {
+            "NT": {
+                "standard": {
+                    "A": "#42FF00", 
+                    "C": "#41B8EE", 
+                    "G": "#FFA500", 
+                    "T": "#EE0B10", 
+                    "Gap": "#666666",
+                }
+            },
+            "AA": {
+                "standard": {
+                    "H": "#FF0000",
+                    "D": "#302ECD",
+                    "E": "#302ECD",
+                    "K": "#23659B",
+                    "N": "#23659B",
+                    "Q": "#23659B",
+                    "R": "#23659B",
+                    "M": "#2F9A2F",
+                    "I": "#42FF00",
+                    "L": "#42FF00",
+                    "V": "#42FF00",
+                    "F": "#F900FF",
+                    "W": "#F900FF",
+                    "Y": "#F900FF",
+                    "C": "#CD2F2E",
+                    "A": "#F9CE2E", 
+                    "G": "#F9CE2E",
+                    "S": "#F9CE2E",
+                    "T": "#F9CE2E",
+                    "P": "#FBFF00",
+                    "Other": "#000000",
+                    "Gap": "#bebebe",
+                }
+            }
+        }
 
-    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
+    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, glycosylation: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
         """ Writes out the mutation plot to a file """
         
         drawing = self.drawing = Drawing(self._width, self._height)
-        self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a)
+
+        self._apobec: bool = apobec
+        self._g_to_a: bool = g_to_a
+        self._glycosylation: bool = glycosylation
+
+        self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a, glycosylation=glycosylation)
+        self.reference = self._mutations.reference
+
         self.narrow_markers: bool = narrow_markers
         self.min_marker_width: float = min_marker_width
 
@@ -244,16 +308,16 @@ class MutationPlot:
             sequence_baseline: Line = Line(x1, y, x2, y, strokeColor=colors.lightgrey)
             drawing.add(sequence_baseline)
 
-            self._draw_mutations(plot_index, mutations)
+            self._draw_mutations(plot_index, mutations, is_reference=(seq_index == self.reference))
 
         return _write(drawing, output_file, self.output_format)
     
-    def _draw_mutations(self, plot_index: int, mutations: dict[int: list]) -> None:
+    def _draw_mutations(self, plot_index: int, mutations: dict[int: list], is_reference: bool=False) -> None:
         """ Draw mutations for a sequence """
 
         for base, mutation in mutations.items():
             for code in mutation:
-                if code in self._plot_colors[self.type]:
+                if code in self._plot_colors[self.type][self.scheme]:
                     x1: float = self.left_margin + self._base_left(base)
                     x2: float = self.left_margin + self._base_left(base+1)
 
@@ -266,27 +330,35 @@ class MutationPlot:
                             x2-(((x2-x1)-self.min_marker_width)/2)
                         )
 
-                    base_color: Color = self._hex_to_color(self._plot_colors[self.type][code])
+                    base_color: Color = self._hex_to_color(self._plot_colors[self.type][self.scheme][code])
                     base_mark: Rect = Rect(x1, y1, x2-x1, y2-y1, fillColor=base_color, strokeColor=base_color, strokeWidth=0.1)
                     self.drawing.add(base_mark)
         
-        # APOBEC and G->A go second so they go on top of other elements
+        # Symboloic markers need to be drawn second so they are on top of the rectangles
         for base, mutation in mutations.items():
+            x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
+            y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
+                
             if "APOBEC" in mutation:
-                x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
-                y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
+                self.draw_circle(x, y)
                 
-                circle = Circle(x, y, (self._seq_height/3)/2, fillColor=self._hex_to_color("#FF00FF"), strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=0.1)
-                
-                self.drawing.add(circle)
-
             elif "G->A mutation" in mutation:
-                x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
-                y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
-                
-                diamond = self._g_to_a_diamond(x, y)
-                
-                self.drawing.add(diamond)
+                self.draw_diamond(x, y)
+
+            elif "Glycosylation" in mutation:
+                if is_reference:
+                    self.draw_circle(x, y)
+                else:
+                    if "Glycosylation" not in self.mutations_list[self.reference].get(base, {}):
+                        self.draw_diamond(x, y, filled=True)
+
+        if self.type == "AA" and self._glycosylation:
+            for base, mutation in self.mutations_list[self.reference].items():
+                if "Glycosylation" in mutation and "Glycosylation" not in mutations.get(base, {}):
+                    x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
+                    y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
+
+                    self.draw_diamond(x, y, color="#0000FF")
 
     def _draw_title(self) -> None:
         """ Draw the title at the top of the plot """
@@ -426,12 +498,20 @@ class MutationPlot:
 
         return sorted(range(len(self.mutations_list)), key=lambda x: len(self.mutations_list[x]))
     
-    def _g_to_a_diamond(self, x: float, y: float) -> Rect:
-        """ Draw a rectangle for a G->A mutation """
+    def draw_diamond(self, x: float, y: float, color: str="#FF00FF", filled: bool=False) -> None:
+        """ Draw a rectangle on the plot """
+        
+        fill_color = self._hex_to_color(color) if filled else None
 
-        diamond = PolyLine([x, y-((self._seq_height/3)/2), x-((self._seq_height/3)/2), y, x, y+((self._seq_height/3)/2), x+((self._seq_height/3)/2), y, x, y-((self._seq_height/3)/2), x-((self._seq_height/3)/2), y], strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=2)
+        diamond = Polygon([x, y-((self._seq_height/3)/2), x-((self._seq_height/3)/2), y, x, y+((self._seq_height/3)/2), x+((self._seq_height/3)/2), y], strokeColor=self._hex_to_color(color), strokeWidth=2, fillColor=fill_color)
+        
+        self.drawing.add(diamond)
 
-        return diamond
+    def draw_circle(self, x: float, y: float, color: str="#FF00FF", filled: bool=True) -> None:
+        """ Draw a circle on the plot"""
+        
+        circle = Circle(x, y, (self._seq_height/3)/2, fillColor=self._hex_to_color(color), strokeColor=self._hex_to_color("#FF00FF"), strokeWidth=0.1)
+        self.drawing.add(circle)
     
     def _get_index_by_id(self, id: str) -> int:
         """ Get the index of a sequence by its id """

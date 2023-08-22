@@ -74,7 +74,12 @@ class MutationStaticTests(unittest.TestCase):
 
         self.assertNotEqual(AlignInfo.Mutations.get_mutations(sequence='ATGC', reference='ATGG', type='NT'), {})
 
-    def test_get_mutations_returns_correct_dict_given_different_sequence_and_reference(self):
+    def test_get_mutations_returns_correct_glycosylation_sites(self):
+        """ get_mutations should return a dictionary with the correct glycosylation sites """
+
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GNS-SQ', sequence='GNS-SQ', type='AA', glycosylation=True), {1: ['Glycosylation']})
+
+    def test_get_mutations_returns_correct_dict_given_different_sequence_and_reference_nt(self):
         """ get_mutations should return a dictionary with the correct keys and values """
 
         self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GTGCGGC-', sequence='AATGCA-T', type='NT'), {0: ['A'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
@@ -82,14 +87,18 @@ class MutationStaticTests(unittest.TestCase):
         self.assertEqual(AlignInfo.Mutations.get_mutations(apobec=True, reference='GTGCGGC-', sequence='AATGCA-T', type='NT'), {0: ['A', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
         self.assertEqual(AlignInfo.Mutations.get_mutations(g_to_a=True, apobec=True, reference='GTGCGGC-', sequence='AATGCA-T', type='NT'), {0: ['A', 'G->A mutation', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
 
+    def test_get_mutations_returns_correct_dict_given_different_sequence_and_reference_aa(self):
+        """ get_mutations should return a dictionary with the correct keys and values """
 
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='MRVMEIRRNYQHL--', sequence='MRAMK-RRNYQHL--', type='AA'), {2: ['A'], 4: ['K'], 5: ['Gap']})
+        
 class MutationObjectTests(unittest.TestCase):
     """ Tests that use the mutation object """
 
     def setUp(self):
         """ Set up an align object to use for testing """
 
-        self.short_align = AlignIO.read(pathlib.PurePath(pathlib.Path(__file__).parent.resolve(), 'Mutation/short_test.fasta'), 'fasta')
+        self.short_align = AlignIO.read(pathlib.PurePath(pathlib.Path(__file__).parent.resolve(), 'Mutation/short_test_nt.fasta'), 'fasta')
         self.short_mutations = AlignInfo.Mutations(self.short_align, type='NT')
 
     def test_list_mutations_raises_error_on_bad_reference(self):
@@ -140,7 +149,7 @@ class MutationPlotStateicTests(unittest.TestCase):
     def test_mutation_plot_guesses_alignment_type_correctly(self):
         """ MutationPlot guesses the alignment type correctly """
 
-        self.assertEqual(MutationPlot.guess_alignment_type(AlignIO.read('mutation/Tests/Mutation/highlighter.fasta', 'fasta')), 'NT')
+        self.assertEqual(MutationPlot.guess_alignment_type(AlignIO.read('mutation/Tests/Mutation/highlighter_nt.fasta', 'fasta')), 'NT')
         self.assertEqual(MutationPlot.guess_alignment_type(AlignIO.read('mutation/Tests/Mutation/highlighter_aa.fasta', 'fasta')), 'AA')
 
     def test_mutation_plot_significant_digits(self):
