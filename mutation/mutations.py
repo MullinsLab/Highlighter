@@ -24,7 +24,7 @@ class Mutations:
         self.mutations: dict[dict[int: list]] = {}
         self.reference: int = 0
 
-    def list_mutations(self, *, reference: int|str=0, apobec: bool=False, g_to_a: bool=False, glycosylation: bool=False) -> dict[int: list]:
+    def list_mutations(self, *, reference: int|str=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence """
 
         reference_str: str = ""
@@ -55,7 +55,7 @@ class Mutations:
             elif isinstance(sequence, str):
                 sequence_str = sequence
 
-            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, type=self.type, apobec=apobec, g_to_a=g_to_a, glycosylation=glycosylation))
+            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, type=self.type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation))
 
         return mutations
         
@@ -69,7 +69,7 @@ class Mutations:
         raise IndexError(f"Could not find sequence with id {id}")
 
     @staticmethod
-    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False, glycosylation: bool=False) -> dict[int: list]:
+    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False) -> dict[int: list]:
         """ Get mutations from a a sequence and a reference sequence 
         returns a dictionary of mutations where the key is the position of the mutation and the value is a list of types of mutations """
 
@@ -93,11 +93,11 @@ class Mutations:
         if len(sequence) != len(reference):
             raise ValueError("Reference and sequence must be the same length")
         
-        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a, glycosylation=glycosylation)
+        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation)
         
     @cache
     @staticmethod
-    def get_mutations_from_str(*, sequence: str, reference: str, type: str, apobec: bool, g_to_a: bool, glycosylation: bool) -> dict[int: list]:
+    def get_mutations_from_str(*, sequence: str, reference: str, type: str, apobec: bool, g_to_a: bool, stop_codons: bool=False, glycosylation: bool) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence
         separated out so it can be cached (Seq and SeqRecord are not hashable) """
 
@@ -106,7 +106,7 @@ class Mutations:
 
         mutations: dict = {}
 
-        if sequence == reference and type == "NT":
+        if sequence == reference and (type == "NT" and not stop_codons) and (type == "AA" and not glycosylation):
             return mutations
 
         for base_index in range(len(sequence)):
@@ -127,8 +127,24 @@ class Mutations:
                         if apobec and base_index <= len(sequence)-3 and sequence[base_index+1] in "AG" and sequence[base_index+2] != "C":
                             mutations[base_index].append("APOBEC")
 
+            # Stop codons only apply to NT sequences
+            if type == "NT":
+                if stop_codons and sequence[base_index] in "TU" and base_index <= len(sequence)-3 and SeqUtils.codon_position(sequence, base_index) == 0:
+                    base_snippet: str = ""
+                    snippet_index: int = base_index+1
+
+                    while len(base_snippet) < 2 and snippet_index < len(sequence):
+                        base_snippet += sequence[snippet_index] if sequence[snippet_index] != "-" else ""
+                        snippet_index += 1
+
+                        if base_snippet in ("AA", "AG", "GA"):
+                            if base_index not in mutations:
+                                mutations[base_index] = []
+
+                            mutations[base_index].append("Stop codon")
+
             # Glycosylation only applies to AA sequences
-            if type == "AA":
+            elif type == "AA":
                 if glycosylation and sequence[base_index] == "N" and base_index <= len(sequence)-3:
                     base_snippet: str = ""
                     snippet_index: int = base_index+1
@@ -156,6 +172,7 @@ from reportlab.pdfbase.pdfmetrics import stringWidth
 
 from reportlab.graphics.shapes import Drawing, String, Line, Rect, Circle, PolyLine, Polygon
 
+from Bio import SeqUtils
 from Bio.Graphics import _write
 from Bio.Align import AlignInfo
 
@@ -257,7 +274,7 @@ class MutationPlot:
             }
         }
 
-    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, glycosylation: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
+    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
         """ Writes out the mutation plot to a file """
         
         drawing = self.drawing = Drawing(self._width, self._height)
@@ -265,8 +282,9 @@ class MutationPlot:
         self._apobec: bool = apobec
         self._g_to_a: bool = g_to_a
         self._glycosylation: bool = glycosylation
+        self._stop_codons: bool = stop_codons
 
-        self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a, glycosylation=glycosylation)
+        self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation)
         self.reference = self._mutations.reference
 
         self.narrow_markers: bool = narrow_markers
@@ -351,6 +369,9 @@ class MutationPlot:
                 else:
                     if "Glycosylation" not in self.mutations_list[self.reference].get(base, {}):
                         self.draw_diamond(x, y, filled=True)
+
+            elif "Stop codon" in mutation:
+                self.draw_diamond(x, y, color="#0000FF")
 
         if self.type == "AA" and self._glycosylation:
             for base, mutation in self.mutations_list[self.reference].items():
@@ -571,3 +592,31 @@ class MutationPlot:
         return "NT"
 
 Graphics.MutationPlot = MutationPlot
+
+
+from Bio import SeqUtils
+
+@cache
+def codon_position(sequence: str|Seq|SeqRecord, base: int) -> int:
+    """ Get the codon position of a base in a sequence """
+
+    if isinstance(sequence, Seq):
+            sequence = str(sequence)
+    elif isinstance(sequence, SeqRecord):
+            sequence = str(sequence.seq)
+    elif not isinstance(sequence, str):
+            raise TypeError(f"Expected sequence to be a string, Seq, or SeqRecord, got {type(sequence)}")
+    
+    if not isinstance(base, int):
+        raise TypeError(f"Expected position to be an int, got {type(base)}")
+
+    if base > len(sequence):
+        raise ValueError(f"Position {base} is greater than the length of the sequence ({len(sequence)})")
+    
+    if sequence[base] == "-":
+        raise ValueError(f"Position {base} is a gap")
+    
+    adjusted_base: int =  base-sequence[:base+1].count("-")
+    return (adjusted_base % 3)
+
+SeqUtils.codon_position = codon_position

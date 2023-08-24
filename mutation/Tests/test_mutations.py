@@ -1,14 +1,58 @@
-import unittest
-import pathlib
+import unittest, os, pathlib
 
 import mutations
 
-from Bio import AlignIO
+from Bio import AlignIO, Phylo, SeqUtils
 from Bio.Align import AlignInfo
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
 from Bio.Graphics import MutationPlot
+
+def file_hash(*, file_name: str) -> str:
+    """ Returns the hash of a file 
+    https://stackoverflow.com/questions/3431825/generating-an-md5-checksum-of-a-file"""
+
+    import hashlib
+
+    hash_md5 = hashlib.md5()
+    with open(file_name, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    
+    return hash_md5.hexdigest()
+
+class SeqUtilsTests(unittest.TestCase):
+    """ Tests of the SeqUtils module """
+
+    def test_codon_position_error_if_invalid_sequence(self):
+        """ codon_position should error if an invalid sequence is provided """
+
+        with self.assertRaises(TypeError):
+            SeqUtils.codon_position(None, 1)
+
+    def test_codon_position_error_if_invalid_position(self):
+        """ codon_position should error if an invalid position is provided """
+
+        with self.assertRaises(TypeError):
+            SeqUtils.codon_position('ATGC', None)
+
+        with self.assertRaises(ValueError):
+            SeqUtils.codon_position('ATGC', 100)
+
+    def test_codon_position_returns_error_if_position_is_gap(self):
+        """ codon_position should error if the position is a gap """
+
+        with self.assertRaises(ValueError):
+            SeqUtils.codon_position('AT-C', 2)
+
+    def test_codon_position_returns_correct_position(self):
+        """ codon_position should return the correct position """
+
+        self.assertEqual(SeqUtils.codon_position('ATGC', 1), 1)
+        self.assertEqual(SeqUtils.codon_position('A-GC', 2), 1)
+        self.assertEqual(SeqUtils.codon_position('A-----GC', 7), 2)
+        self.assertEqual(SeqUtils.codon_position('A-GC--A', 6),0)
 
 class MutationStaticTests(unittest.TestCase):
     """ Test the static methods of the mutation object """
@@ -79,6 +123,19 @@ class MutationStaticTests(unittest.TestCase):
 
         self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GNS-SQ', sequence='GNS-SQ', type='AA', glycosylation=True), {1: ['Glycosylation']})
 
+    def test_get_mutations_returns_correct_stop_codons(self):
+        """ get_mutations should return a dictionary with the correct stop codons """
+
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GTAA-', sequence='GTAA-', type='NT', stop_codons=True), {})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GGGTAA-', sequence='GGGTAA-', type='NT', stop_codons=True), {3: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GG--GTAA-', sequence='GG--GTAA-', type='NT', stop_codons=True), {5: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='GGGUAG-', sequence='GGGUAG-', type='NT', stop_codons=True), {3: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='TAG', sequence='TAG', type='NT', stop_codons=True), {0: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='TGA', sequence='TGA', type='NT', stop_codons=True), {0: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='TGATAG', sequence='TGATAG', type='NT', stop_codons=True), {0: ['Stop codon'], 3: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='TGATAG', sequence='TGATAG', type='NT', stop_codons=False), {})
+        self.assertEqual(AlignInfo.Mutations.get_mutations(reference='TGATAG', sequence='TGATAG', type='NT'), {})
+
     def test_get_mutations_returns_correct_dict_given_different_sequence_and_reference_nt(self):
         """ get_mutations should return a dictionary with the correct keys and values """
 
@@ -143,7 +200,7 @@ class MutationObjectTests(unittest.TestCase):
                         self.assertEqual(self.short_mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a), result[reference][apobec][g_to_a])
 
 
-class MutationPlotStateicTests(unittest.TestCase):
+class MutationPlotStaticTests(unittest.TestCase):
     """ Tests that use the static methods of the MutationPlot class """
 
     def test_mutation_plot_guesses_alignment_type_correctly(self):
@@ -165,24 +222,33 @@ class MutationPlotTests(unittest.TestCase):
     def setUp(self):
         """ Set up an align object to use for testing """
 
-        self.align = AlignIO.read('mutation/Tests/Mutation/test.fasta', 'fasta')
-        self.mutation_plot = MutationPlot(self.align)
+        self.align_nt = AlignIO.read('mutation/Tests/Mutation/highlighter_nt.fasta', 'fasta')
+        self.mutation_plot_nt = MutationPlot(self.align_nt)
+
+        self.align_aa = AlignIO.read('mutation/Tests/Mutation/highlighter_aa.fasta', 'fasta')
+        self.mutation_plot_aa = MutationPlot(self.align_aa)
+
+        self.align_hiv_nt = AlignIO.read('mutation/Tests/Mutation/hiv_nt.fasta', 'fasta')
+        self.tree_hiv_nt = Phylo.read('mutation/Tests/Mutation/hiv_nt_nexus.tre', 'nexus')
+        self.mutation_plot_hiv_nt = MutationPlot(self.align_hiv_nt, tree=self.tree_hiv_nt)
 
     def test_mutation_plot_inits_correctly(self):
         """ MutationPlot should initialize correctly """
 
-        self.assertIs(self.mutation_plot.alignment, self.align)
+        self.assertIs(self.mutation_plot_nt.alignment, self.align_nt)
 
     def test_mutation_plot_fails_init_with_bad_tree(self):
         """ MutationPlot should fail to initialize if a bad tree is provided """
 
         with self.assertRaises(TypeError):
-            MutationPlot(self.align, tree='bad_tree')
+            MutationPlot(self.align_nt, tree='bad_tree')
 
-    # def test_mutation_plot_height_is_18_per_sequence(self):
-    #     """ MutationPlot should have a height of 18 per sequence """
+    def test_mutation_plot_creates_valid_plot_nt(self):
+        """ MutationPlot should create a valid plot """
 
-    #     self.assertEqual(self.mutation_plot.height, 18 * len(self.align))
+        self.mutation_plot_nt.draw('mutation/Tests/Mutation/mutation_plot_nt.svg')
+        self.assertEqual(file_hash(file_name='mutation/Tests/Mutation/mutation_plot_nt.svg'), 'a1fae178342d8ced32767e4198e6dc9b')
+        os.remove("mutation/Tests/Mutation/mutation_plot_nt.svg")
 
 if __name__ == '__main__':
     unittest.main()
