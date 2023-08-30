@@ -11,10 +11,11 @@ from Bio.SeqRecord import SeqRecord
 class Mutations:
     """ Get mutation info from an alignment """
 
-    def __init__(self, alignment, *, type: str=None):
+    def __init__(self, alignment, *, type: str=None, codon_offset: int=0):
         """ Initialize the Mutations object """
 
         self.alignment = alignment
+        self.codon_offet: int=codon_offset % 3
 
         if type not in ("NT", "AA"):
             raise ValueError("type must be provided (either 'NT' or 'AA')")
@@ -24,7 +25,7 @@ class Mutations:
         self.mutations: dict[dict[int: list]] = {}
         self.reference: int = 0
 
-    def list_mutations(self, *, reference: int|str=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False) -> dict[int: list]:
+    def list_mutations(self, *, reference: int|str=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, codon_offset: int=0) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence """
 
         reference_str: str = ""
@@ -55,7 +56,7 @@ class Mutations:
             elif isinstance(sequence, str):
                 sequence_str = sequence
 
-            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, type=self.type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation))
+            mutations.append(self.get_mutations(sequence=sequence_str, reference=reference_str, type=self.type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=codon_offset))
 
         return mutations
         
@@ -69,7 +70,7 @@ class Mutations:
         raise IndexError(f"Could not find sequence with id {id}")
 
     @staticmethod
-    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False) -> dict[int: list]:
+    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, codon_offset: int=0) -> dict[int: list]:
         """ Get mutations from a a sequence and a reference sequence 
         returns a dictionary of mutations where the key is the position of the mutation and the value is a list of types of mutations """
 
@@ -93,11 +94,11 @@ class Mutations:
         if len(sequence) != len(reference):
             raise ValueError("Reference and sequence must be the same length")
         
-        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation)
+        return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=codon_offset)
         
     @cache
     @staticmethod
-    def get_mutations_from_str(*, sequence: str, reference: str, type: str, apobec: bool, g_to_a: bool, stop_codons: bool=False, glycosylation: bool) -> dict[int: list]:
+    def get_mutations_from_str(*, sequence: str, reference: str, type: str, apobec: bool, g_to_a: bool, stop_codons: bool=False, glycosylation: bool, codon_offset: int=0) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence
         separated out so it can be cached (Seq and SeqRecord are not hashable) """
 
@@ -129,7 +130,7 @@ class Mutations:
 
             # Stop codons only apply to NT sequences
             if type == "NT":
-                if stop_codons and sequence[base_index] in "TU" and base_index <= len(sequence)-3 and SeqUtils.codon_position(sequence, base_index) == 0:
+                if stop_codons and sequence[base_index] in "TU" and base_index <= len(sequence)-3 and SeqUtils.codon_position(sequence, base_index, codon_offset=codon_offset) == 0:
                     base_snippet: str = ""
                     snippet_index: int = base_index+1
 
@@ -180,11 +181,12 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, scheme: str="standard", tree: str|object=None, output_format: str="svg", seq_name_font: str="Helvetica", seq_name_font_size: int=20, left_margin: float=.25, top_margin: float=.25, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=30, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=15, ruler_major_ticks: int=10, ruler_minor_ticks=3):
+    def __init__(self, alignment, *, type: str=None, scheme: str="LANL", tree: str|object=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
-        
+        self.codon_offset = codon_offset % 3
+
         if type not in ("NT", "AA"):
             self.type = self.guess_alignment_type(alignment)
         else:
@@ -207,15 +209,15 @@ class MutationPlot:
         self.seq_name_font: str = seq_name_font
         self.seq_name_font_size: int = seq_name_font_size
 
-        self.top_margin: float = inch * top_margin
-        self.bottom_margin: float = inch * botom_margin
-        self.left_margin: float = inch * left_margin
-        self.right_margin: float = inch * right_margin
+        self.top_margin: float = top_margin
+        self.bottom_margin: float = botom_margin
+        self.left_margin: float = left_margin
+        self.right_margin: float = right_margin
 
         self.title: str = title
         self.title_font: str = title_font
         self.title_font_size: int = title_font_size
-        self._title_font_height: float = self._font_height(self.title_font, self.title_font_size)
+        self._title_font_height: float = self.title_font_size
         self._title_height = 0 if not title else self._title_font_height*2
 
         self.ruler: bool = ruler
@@ -223,22 +225,22 @@ class MutationPlot:
         self.ruler_font_size: int = ruler_font_size
         self.ruler_major_ticks: int = ruler_major_ticks
         self.ruler_minor_ticks: int = ruler_minor_ticks
-        self._ruler_font_height: float = self._font_height(self.ruler_font, self.ruler_font_size)
+        self._ruler_font_height: float = self.ruler_font_size
         self._ruler_height = 0 if not ruler else self._ruler_font_height * 3
 
-        self._plot_width: float = 14 * inch
+        self.plot_width: float = plot_width
         self._plot_floor: float = self.bottom_margin + self._ruler_height
 
         self._seq_name_width: float = self._max_seq_name_width
-        self._width: float = self.left_margin + self._plot_width + (inch/4) + self._seq_name_width + self.right_margin
+        self._width: float = self.left_margin + self.plot_width + (inch/4) + self._seq_name_width + self.right_margin
         
-        self._seq_height: float = self._font_height(self.seq_name_font, self.seq_name_font_size)
-        self._seq_gap: float = self._seq_height / 5
-        self._height: float = len(self.alignment) * (self._seq_height + self._seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
+        self._seq_height: float = self.seq_name_font_size
+        self.seq_gap: float = self._seq_height / 5 if seq_gap is None else seq_gap
+        self._height: float = len(self.alignment) * (self._seq_height + self.seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
 
         self._plot_colors: dict[str: [dict[str: str]]] = {
             "NT": {
-                "standard": {
+                "LANL": {
                     "A": "#42FF00", 
                     "C": "#41B8EE", 
                     "G": "#FFA500", 
@@ -247,7 +249,7 @@ class MutationPlot:
                 }
             },
             "AA": {
-                "standard": {
+                "LANL": {
                     "H": "#FF0000",
                     "D": "#302ECD",
                     "E": "#302ECD",
@@ -284,7 +286,7 @@ class MutationPlot:
         self._glycosylation: bool = glycosylation
         self._stop_codons: bool = stop_codons
 
-        self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation)
+        self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
         self.reference = self._mutations.reference
 
         self.narrow_markers: bool = narrow_markers
@@ -314,15 +316,15 @@ class MutationPlot:
             if self.mark_reference and seq_index == self._mutations.reference:
                 id += " (r)"
 
-            x: float = self.left_margin + self._plot_width + (inch/4)
-            y: float = ((self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap)) + self._plot_floor
+            x: float = self.left_margin + self.plot_width + (inch/4)
+            y: float = ((self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap)) + self._plot_floor
             sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
             drawing.add(sequence_str, id)
 
             # Add base line for sequence
             x1: float = self.left_margin
-            x2: float = self.left_margin + self._plot_width
-            y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
+            x2: float = self.left_margin + self.plot_width
+            y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
             sequence_baseline: Line = Line(x1, y, x2, y, strokeColor=colors.lightgrey)
             drawing.add(sequence_baseline)
 
@@ -339,8 +341,8 @@ class MutationPlot:
                     x1: float = self.left_margin + self._base_left(base)
                     x2: float = self.left_margin + self._base_left(base+1)
 
-                    y1: float = ((self._seq_count-plot_index) * (self._seq_height + self._seq_gap)) + (self._seq_gap/2) + self._plot_floor
-                    y2: float = ((self._seq_count-(plot_index+1)) * (self._seq_height + self._seq_gap)) + self._seq_gap + self._plot_floor
+                    y1: float = ((self._seq_count-plot_index) * (self._seq_height + self.seq_gap)) + (self.seq_gap/2) + self._plot_floor
+                    y2: float = ((self._seq_count-(plot_index+1)) * (self._seq_height + self.seq_gap)) + self.seq_gap + self._plot_floor
 
                     if code != "Gap" and self.narrow_markers and x2-x1 > self.min_marker_width:
                         x1, x2 = (
@@ -355,7 +357,7 @@ class MutationPlot:
         # Symboloic markers need to be drawn second so they are on top of the rectangles
         for base, mutation in mutations.items():
             x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
-            y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
+            y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
                 
             if "APOBEC" in mutation:
                 self.draw_circle(x, y)
@@ -377,7 +379,7 @@ class MutationPlot:
             for base, mutation in self.mutations_list[self.reference].items():
                 if "Glycosylation" in mutation and "Glycosylation" not in mutations.get(base, {}):
                     x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
-                    y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self._seq_gap) + self._seq_gap + self._plot_floor
+                    y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
 
                     self.draw_diamond(x, y, color="#0000FF")
 
@@ -385,7 +387,7 @@ class MutationPlot:
         """ Draw the title at the top of the plot """
             
         if self.title:
-            x: float = self.left_margin + (self._plot_width/2)
+            x: float = self.left_margin + (self.plot_width/2)
             y: float = self._height - self.top_margin - (self._title_font_height/2)
 
             self.drawing.add(String(x, y, self.title, textAnchor="middle", fontName=self.title_font, fontSize=self.title_font_size))
@@ -413,7 +415,7 @@ class MutationPlot:
 
         # Draw vertical line
         x1: float = self.left_margin
-        x2: float = self.left_margin + self._plot_width
+        x2: float = self.left_margin + self.plot_width
         y: float = self.bottom_margin + (self._ruler_font_height * 3)
 
         ruler_line: Line = Line(x1, y, x2, y, strokeColor=colors.black, strokeWidth=2)
@@ -475,9 +477,9 @@ class MutationPlot:
         """ Get the left coordinate of a base """
 
         if base == self._seq_length:
-            return self._plot_width
+            return self.plot_width
         
-        return (base / self._seq_length) * self._plot_width
+        return (base / self._seq_length) * self.plot_width
     
     def _base_center(self, base: int) -> float:
         """ Get the center coordinate of a base """
@@ -499,12 +501,6 @@ class MutationPlot:
                 max_width = width
         
         return max_width
-    
-    def _font_height(self, font, size) -> float:
-        """ Get the height of a font """
-
-        _, bottom, _, top = String(0, 0, string.ascii_letters + string.digits + "_", fontName=font, fontSize=size).getBounds()
-        return top - bottom
     
     def _hex_to_color(self, hex: str) -> Color:
         """ Convert a hex color to rgb """
@@ -597,7 +593,7 @@ Graphics.MutationPlot = MutationPlot
 from Bio import SeqUtils
 
 @cache
-def codon_position(sequence: str|Seq|SeqRecord, base: int) -> int:
+def codon_position(sequence: str|Seq|SeqRecord, base: int, *, codon_offset: int=0) -> int:
     """ Get the codon position of a base in a sequence """
 
     if isinstance(sequence, Seq):
@@ -617,6 +613,6 @@ def codon_position(sequence: str|Seq|SeqRecord, base: int) -> int:
         raise ValueError(f"Position {base} is a gap")
     
     adjusted_base: int =  base-sequence[:base+1].count("-")
-    return (adjusted_base % 3)
+    return ((adjusted_base + codon_offset) % 3)
 
 SeqUtils.codon_position = codon_position
