@@ -6,13 +6,24 @@ from Bio.Align import AlignInfo
 from Bio.Phylo import NexusIO, BaseTree
 from Bio.Graphics import MutationPlot
 
-# V703_0013_090-091_GP_NT_collapsed_by_timepoint
+
+# V704_0011_240-241_REN
 if True:
+    align = AlignIO.read("mutation/Tests/Private/V704_0011_240-241_REN_highlighter.fasta", "fasta")
+    tree = Phylo.read("mutation/Tests/Private/V704_0011_240-241_REN_phyml_tree.tre_nexus.tre", "nexus")
+
+    mutation_plot = MutationPlot(align, tree=tree, top_margin=12, seq_gap=-0.185*2, seq_name_font_size=16, ruler_font_size=12, plot_width=6*72, bottom_margin=45, right_margin=10) # (46*2)-36
+    mutation_plot.draw("V704_0011_240-241_REN_highlighter.svg", apobec=True, g_to_a=True, sort="tree", reference="V704_0011_240_REN_NT_29_1")
+
+# V703_0013_090-091_GP_NT_collapsed_by_timepoint
+if False:
     align = AlignIO.read("mutation/Tests/Private/V703_0013_090-091_GP_NT_collapsed_by_timepoint.fasta", "fasta")
     tree = Phylo.read("mutation/Tests/Private/V703_0013_090-091_GP_NT_collapsed_by_timepoint.phy_phyml_tree.txt_nexus.tre", "nexus")
 
+    # seq_gap=-0.0185*2
+
     # mutation_plot = MutationPlot(align, tree=tree, top_margin=12, seq_gap=0.9815*2, seq_name_font_size=14, plot_width=6*72)
-    mutation_plot = MutationPlot(align, tree=tree, top_margin=12, seq_gap=-0.0185*2, seq_name_font_size=16, plot_width=6*72)
+    mutation_plot = MutationPlot(align, tree=tree, top_margin=12, seq_gap=-0.185*2, seq_name_font_size=16, ruler_font_size=12, plot_width=6*72, bottom_margin=(46*2)-36)
     mutation_plot.draw("V703_0013_090-091_GP_NT_collapsed_by_timepoint.svg", apobec=True, g_to_a=True, sort="tree")
 
 # V702_4390_140_env_NT_collapsed_by_TP.fasta
@@ -34,11 +45,11 @@ if False:
     # mutation_plot.draw("V702_4390_140_env_NT_collapsed_by_TP.offset_2.svg", apobec=True, g_to_a=True, stop_codons=True, sort="tree")
 
 # Draw plot for hiv_nt.fasta
-if True:
+if False:
     align = AlignIO.read("mutation/Tests/Mutation/hiv_nt.fasta", "fasta")
     tree = Phylo.read("mutation/Tests/Mutation/hiv_nt_nexus.tre", "nexus")
 
-    mutation_plot = MutationPlot(align, tree=tree)
+    mutation_plot = MutationPlot(align, tree=tree, top_margin=12, seq_gap=-0.185*2, seq_name_font_size=16, ruler_font_size=12, plot_width=6*72, bottom_margin=45, right_margin=10) # (46*2)-36
     mutation_plot.draw("DEMO_highlighter.svg", apobec=True, g_to_a=True, sort="tree")
 
     # mutation_plot = MutationPlot(align, tree=tree, title="HIV_DEMO Offset 0", codon_offset=0)

@@ -181,7 +181,7 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, scheme: str="LANL", tree: str|object=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, botom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
+    def __init__(self, alignment, *, type: str=None, scheme: str="LANL", tree: str|object=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
@@ -210,7 +210,7 @@ class MutationPlot:
         self.seq_name_font_size: int = seq_name_font_size
 
         self.top_margin: float = top_margin
-        self.bottom_margin: float = botom_margin
+        self.bottom_margin: float = bottom_margin
         self.left_margin: float = left_margin
         self.right_margin: float = right_margin
 
@@ -305,7 +305,8 @@ class MutationPlot:
             sorted_keys = range(len(self.mutations_list))
 
         self._draw_title()
-        self._draw_ruler()
+        if self.ruler:
+            self._draw_ruler()
 
         # for seq_index, mutations in enumerate(self.mutations_list):
         for plot_index, seq_index in enumerate(sorted_keys):
