@@ -1,6 +1,7 @@
 import string, math
 
 from functools import cache
+from typing import Union
 
 import Bio
 from Bio import Graphics, Phylo
@@ -25,7 +26,7 @@ class Mutations:
         self.mutations: dict[dict[int: list]] = {}
         self.reference: int = 0
 
-    def list_mutations(self, *, reference: int|str=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, codon_offset: int=0) -> dict[int: list]:
+    def list_mutations(self, *, reference: Union[int, str]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, codon_offset: int=0) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence """
 
         reference_str: str = ""
@@ -70,7 +71,7 @@ class Mutations:
         raise IndexError(f"Could not find sequence with id {id}")
 
     @staticmethod
-    def get_mutations(*, sequence: str|Seq|SeqRecord, reference: str|Seq|SeqRecord, type: str=None, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, codon_offset: int=0) -> dict[int: list]:
+    def get_mutations(*, sequence: Union[str, Seq, SeqRecord], reference: Union[str, Seq, SeqRecord], type: str=None, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, codon_offset: int=0) -> dict[int: list]:
         """ Get mutations from a a sequence and a reference sequence 
         returns a dictionary of mutations where the key is the position of the mutation and the value is a list of types of mutations """
 
@@ -181,7 +182,7 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, scheme: str="LANL", tree: str|object=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
+    def __init__(self, alignment, *, type: str=None, scheme: str="LANL", tree: Union[str, object]=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
@@ -276,7 +277,7 @@ class MutationPlot:
             }
         }
 
-    def draw(self, output_file, reference: str|int=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
+    def draw(self, output_file, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
         """ Writes out the mutation plot to a file """
         
         drawing = self.drawing = Drawing(self._width, self._height)
@@ -594,7 +595,7 @@ Graphics.MutationPlot = MutationPlot
 from Bio import SeqUtils
 
 @cache
-def codon_position(sequence: str|Seq|SeqRecord, base: int, *, codon_offset: int=0) -> int:
+def codon_position(sequence: Union[str, Seq, SeqRecord], base: int, *, codon_offset: int=0) -> int:
     """ Get the codon position of a base in a sequence """
 
     if isinstance(sequence, Seq):
