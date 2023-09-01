@@ -96,9 +96,9 @@ class Mutations:
             raise ValueError("Reference and sequence must be the same length")
         
         return Mutations.get_mutations_from_str(sequence=sequence, reference=reference, type=type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=codon_offset)
-        
-    @cache
+    
     @staticmethod
+    @cache
     def get_mutations_from_str(*, sequence: str, reference: str, type: str, apobec: bool, g_to_a: bool, stop_codons: bool=False, glycosylation: bool, codon_offset: int=0) -> dict[int: list]:
         """ Get mutations from a sequence and a reference sequence
         separated out so it can be cached (Seq and SeqRecord are not hashable) """
