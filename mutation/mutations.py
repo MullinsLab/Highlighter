@@ -182,7 +182,7 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, scheme: str="LANL", tree: Union[str, object]=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
+    def __init__(self, alignment, *, type: str=None, tree: Union[str, object]=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
@@ -192,8 +192,6 @@ class MutationPlot:
             self.type = self.guess_alignment_type(alignment)
         else:
             self.type = type
-        
-        self.scheme: str = scheme
 
         if tree is not None:
             if isinstance(tree, Bio.Phylo.BaseTree.Tree):
@@ -247,6 +245,13 @@ class MutationPlot:
                     "G": "#FFA500", 
                     "T": "#EE0B10", 
                     "Gap": "#666666",
+                },
+                "ML": {
+                    "A": "#36b809", 
+                    "C": "#1282b5", 
+                    "G": "#FFA500", 
+                    "T": "#c48002", 
+                    "Gap": "#666666",
                 }
             },
             "AA": {
@@ -277,10 +282,13 @@ class MutationPlot:
             }
         }
 
-    def draw(self, output_file, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", narrow_markers: bool=False, min_marker_width: float=1):
+    def draw(self, output_file, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL"):
         """ Writes out the mutation plot to a file """
         
         drawing = self.drawing = Drawing(self._width, self._height)
+
+        self.scheme: str = scheme
+        self._current_scheme: dict = self._plot_colors[self.type][self.scheme] if self.scheme in self._plot_colors[self.type] else self._plot_colors[self.type]["LANL"]
 
         self._apobec: bool = apobec
         self._g_to_a: bool = g_to_a
@@ -290,8 +298,7 @@ class MutationPlot:
         self.mutations_list = self._mutations.list_mutations(reference=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
         self.reference = self._mutations.reference
 
-        self.narrow_markers: bool = narrow_markers
-        self.min_marker_width: float = min_marker_width
+        self.mark_width: float = mark_width
 
         if sort == "similar":
             sorted_keys = self._sort_similar()
@@ -319,7 +326,8 @@ class MutationPlot:
                 id += " (r)"
 
             x: float = self.left_margin + self.plot_width + (inch/4)
-            y: float = ((self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap)) + self._plot_floor
+            #y: float = ((self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap)) + self._plot_floor
+            y: float = ((self._seq_count-(plot_index + .75)) * (self._seq_height + self.seq_gap))  + self.seq_gap + self._plot_floor
             sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
             drawing.add(sequence_str, id)
 
@@ -339,20 +347,14 @@ class MutationPlot:
 
         for base, mutation in mutations.items():
             for code in mutation:
-                if code in self._plot_colors[self.type][self.scheme]:
+                if code in self._current_scheme:
                     x1: float = self.left_margin + self._base_left(base)
-                    x2: float = self.left_margin + self._base_left(base+1)
+                    x2: float = self.left_margin + self._base_left(base+self.mark_width)
 
                     y1: float = ((self._seq_count-plot_index) * (self._seq_height + self.seq_gap)) + (self.seq_gap/2) + self._plot_floor
                     y2: float = ((self._seq_count-(plot_index+1)) * (self._seq_height + self.seq_gap)) + self.seq_gap + self._plot_floor
 
-                    if code != "Gap" and self.narrow_markers and x2-x1 > self.min_marker_width:
-                        x1, x2 = (
-                            x1+(((x2-x1)-self.min_marker_width)/2), 
-                            x2-(((x2-x1)-self.min_marker_width)/2)
-                        )
-
-                    base_color: Color = self._hex_to_color(self._plot_colors[self.type][self.scheme][code])
+                    base_color: Color = self._hex_to_color(self._current_scheme[code])
                     base_mark: Rect = Rect(x1, y1, x2-x1, y2-y1, fillColor=base_color, strokeColor=base_color, strokeWidth=0.1)
                     self.drawing.add(base_mark)
         
@@ -478,8 +480,8 @@ class MutationPlot:
     def _base_left(self, base: int) -> float:
         """ Get the left coordinate of a base """
 
-        if base == self._seq_length:
-            return self.plot_width
+        # if base == self._seq_length:
+        #     return self.plot_width
         
         return (base / self._seq_length) * self.plot_width
     
@@ -596,7 +598,8 @@ from Bio import SeqUtils
 
 @cache
 def codon_position(sequence: Union[str, Seq, SeqRecord], base: int, *, codon_offset: int=0) -> int:
-    """ Get the codon position of a base in a sequence """
+    """ Get the codon position of a base in a sequence
+    returns 0 for the first base of a codon, 1 for the second, or 2 for the third) """
 
     if isinstance(sequence, Seq):
             sequence = str(sequence)

@@ -13,7 +13,8 @@ if True:
     tree = Phylo.read("mutation/Tests/Private/V704_0011_240-241_REN_phyml_tree.tre_nexus.tre", "nexus")
 
     mutation_plot = MutationPlot(align, tree=tree, top_margin=12, seq_gap=-0.185*2, seq_name_font_size=16, ruler_font_size=12, plot_width=6*72, bottom_margin=45, right_margin=10) # (46*2)-36
-    mutation_plot.draw("V704_0011_240-241_REN_highlighter.svg", apobec=True, g_to_a=True, sort="tree", reference="V704_0011_240_REN_NT_29_1")
+    mutation_plot.draw("V704_0011_240-241_REN_highlighter-7.svg", apobec=True, g_to_a=True, glycosylation=True, sort="tree", reference="V704_0011_240_REN_NT_29_1", mark_width=7, scheme="ML")
+    mutation_plot.draw("V704_0011_240-241_REN_highlighter-1.svg", apobec=True, g_to_a=True, glycosylation=True, sort="tree", reference="V704_0011_240_REN_NT_29_1", mark_width=1, scheme="ML")
 
 # V703_0013_090-091_GP_NT_collapsed_by_timepoint
 if False:

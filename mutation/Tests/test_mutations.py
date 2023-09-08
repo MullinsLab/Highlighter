@@ -247,7 +247,7 @@ class MutationPlotTests(unittest.TestCase):
         """ MutationPlot should create a valid plot """
 
         self.mutation_plot_nt.draw('mutation/Tests/Mutation/mutation_plot_nt.svg')
-        self.assertEqual(file_hash(file_name='mutation/Tests/Mutation/mutation_plot_nt.svg'), 'a1fae178342d8ced32767e4198e6dc9b')
+        self.assertEqual(file_hash(file_name='mutation/Tests/Mutation/mutation_plot_nt.svg'), 'a40951743cdfdd5d3b7c4d15431400fd')
         os.remove("mutation/Tests/Mutation/mutation_plot_nt.svg")
 
 if __name__ == '__main__':
