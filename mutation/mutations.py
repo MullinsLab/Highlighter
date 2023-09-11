@@ -182,7 +182,7 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, tree: Union[str, object]=None, output_format: str="svg", plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title: str=None, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
+    def __init__(self, alignment, *, type: str=None, tree: Union[str, object]=None, plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
@@ -204,7 +204,6 @@ class MutationPlot:
         self._seq_length = len(alignment[0])
         self.mark_reference: bool = mark_reference
 
-        self.output_format: str = output_format
         self.seq_name_font: str = seq_name_font
         self.seq_name_font_size: int = seq_name_font_size
 
@@ -213,11 +212,8 @@ class MutationPlot:
         self.left_margin: float = left_margin
         self.right_margin: float = right_margin
 
-        self.title: str = title
         self.title_font: str = title_font
         self.title_font_size: int = title_font_size
-        self._title_font_height: float = self.title_font_size
-        self._title_height = 0 if not title else self._title_font_height*2
 
         self.ruler: bool = ruler
         self.ruler_font: str = ruler_font
@@ -225,17 +221,11 @@ class MutationPlot:
         self.ruler_major_ticks: int = ruler_major_ticks
         self.ruler_minor_ticks: int = ruler_minor_ticks
         self._ruler_font_height: float = self.ruler_font_size
-        self._ruler_height = 0 if not ruler else self._ruler_font_height * 3
 
         self.plot_width: float = plot_width
-        self._plot_floor: float = self.bottom_margin + self._ruler_height
 
-        self._seq_name_width: float = self._max_seq_name_width
-        self._width: float = self.left_margin + self.plot_width + (inch/4) + self._seq_name_width + self.right_margin
-        
         self._seq_height: float = self.seq_name_font_size
         self.seq_gap: float = self._seq_height / 5 if seq_gap is None else seq_gap
-        self._height: float = len(self.alignment) * (self._seq_height + self.seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
 
         self._plot_colors: dict[str: [dict[str: str]]] = {
             "NT": {
@@ -282,10 +272,23 @@ class MutationPlot:
             }
         }
 
-    def draw(self, output_file, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL"):
+    def draw(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1):
         """ Writes out the mutation plot to a file """
         
-        drawing = self.drawing = Drawing(self._width, self._height)
+        self.output_format: str = output_format
+
+        self.title: str = title
+        self._title_font_height: float = self.title_font_size
+        self._title_height = 0 if not title else self._title_font_height*2
+
+        self._ruler_height = 0 if not self.ruler else self._ruler_font_height * 3
+
+        self._plot_floor: float = self.bottom_margin + self._ruler_height
+
+        self._seq_name_width: float = self._max_seq_name_width
+        self._width: float = self.left_margin + self.plot_width + (inch/4) + self._seq_name_width + self.right_margin
+        
+        self._height: float = len(self.alignment) * (self._seq_height + self.seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
 
         self.scheme: str = scheme
         self._current_scheme: dict = self._plot_colors[self.type][self.scheme] if self.scheme in self._plot_colors[self.type] else self._plot_colors[self.type]["LANL"]
@@ -299,6 +302,10 @@ class MutationPlot:
         self.reference = self._mutations.reference
 
         self.mark_width: float = mark_width
+
+        self.scale = scale
+
+        drawing = self.drawing = Drawing(self._width, self._height)
 
         if sort == "similar":
             sorted_keys = self._sort_similar()
@@ -326,7 +333,6 @@ class MutationPlot:
                 id += " (r)"
 
             x: float = self.left_margin + self.plot_width + (inch/4)
-            #y: float = ((self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap)) + self._plot_floor
             y: float = ((self._seq_count-(plot_index + .75)) * (self._seq_height + self.seq_gap))  + self.seq_gap + self._plot_floor
             sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
             drawing.add(sequence_str, id)
@@ -340,7 +346,7 @@ class MutationPlot:
 
             self._draw_mutations(plot_index, mutations, is_reference=(seq_index == self.reference))
 
-        return _write(drawing, output_file, self.output_format)
+        return _write(drawing, output_file, self.output_format, dpi=288*self.scale)
     
     def _draw_mutations(self, plot_index: int, mutations: dict[int: list], is_reference: bool=False) -> None:
         """ Draw mutations for a sequence """
