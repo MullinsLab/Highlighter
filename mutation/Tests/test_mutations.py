@@ -215,12 +215,12 @@ class MutationStaticMatchTests(unittest.TestCase):
     def test_get_matches_returns_correct_matches_given_different_sequence_and_reference(self):
         """ get_matches should return a dictionary with the correct keys and values """
 
-        self.assertEqual(AlignInfo.Mutations.get_matches(references='GTGCGGC-', sequence='GTGCGGCT', seq_type='NT'), {7: [0]})
+        self.assertEqual(AlignInfo.Mutations.get_matches(references='GTGCGGC-', sequence='GTGCGGCT', seq_type='NT'), {7: [0, -1]})
 
     def test_get_matches_returns_correct_matches_given_multiple_references(self):
         """ get_matches should return a dictionary with the correct keys and values """
 
-        self.assertEqual(AlignInfo.Mutations.get_matches(references=['GTGCGGC-', 'GTGTGGCT'], sequence='GTGCCGCT', seq_type='NT'), {3: [1], 4: [0, 1], 7: [0]})
+        self.assertEqual(AlignInfo.Mutations.get_matches(references=['GTGCGGC-', 'GTGTGGCT'], sequence='GTGCCGCT', seq_type='NT'), {3: [1], 4: [0, 1, -1], 7: [0]})
 
    
 class MutationObjectMismatchTests(unittest.TestCase):
@@ -286,7 +286,7 @@ class MutationObjectMismatchTests(unittest.TestCase):
     def test_list_matches_returns_correct_list(self):
         """ list_matches should return a the correct list """
 
-        result: list = [{}, {}, {0: [1], 7: [0]}, {0: [0], 7: [1]}, {0: [0], 3: [0, 1], 7: [1]}]
+        result: list = [{}, {}, {0: [1], 7: [0]}, {0: [0], 7: [1]}, {0: [0], 3: [0, 1, -1], 7: [1]}]
         self.assertEqual(self.medium_mutations.list_matches(references=[0, 1]), result)
 
 class MutationPlotStaticTests(unittest.TestCase):
@@ -342,46 +342,51 @@ class MutationPlotTests(unittest.TestCase):
     def test_mutation_plot_creates_valid_plot_nt(self):
         """ MutationPlot should create a valid plot """
 
-        #return
+        # return
 
         hashes: dict = {
-            'mutation/Tests/Mutation/zz_nt.bmp': '81c8c577e086484c01094058eabfca59',
-            'mutation/Tests/Mutation/zz_nt.eps': '51bc03aa993d918158cd4520d4e0986a',
-            'mutation/Tests/Mutation/zz_nt.gif': 'def41a67d6d8314892cd4b8c61fdf7c1',
-            'mutation/Tests/Mutation/zz_nt.jpg': '37caaa5fd4abdfe10ff1c3c45176626f',
-            'mutation/Tests/Mutation/zz_nt.png': 'ca63bd39385205c7b03b120e5fde50ee',
-            'mutation/Tests/Mutation/zz_nt.ps': '51bc03aa993d918158cd4520d4e0986a',
-            'mutation/Tests/Mutation/zz_nt.svg': 'a40951743cdfdd5d3b7c4d15431400fd',
-            'mutation/Tests/Mutation/zz_nt.tif': 'b42ed4b0f0e7b28fedd57d2f4a5d3f91',
-            'mutation/Tests/Mutation/zz_nt.tiff': '105b7c4e7822f5b40df1510fd6dfe199',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-False.svg': 'a40951743cdfdd5d3b7c4d15431400fd',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-True.svg': '73ce6b6b7ff466c8612bc267983cee93',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-False.svg': 'f573fbeaa87adba49f718caf64509782',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-True.svg': '7eaf176996901444fd6e28c6abf942a6',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-False.svg': 'f56be954ce6a24f54dd38f3eac9d70e9',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-True.svg': 'c5e747947afaab60d6d8b9d3206ab1cb',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-False.svg': 'f8b0b9c2c39306ab4b07d6856094d1ea',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-True.svg': 'b714cfc0aa70b40c19d5b6bbc533372c',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-False.svg': 'fc498f41c78c3faf3b63d96d93fdbf5e',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-True.svg': '39cb41c9e41e5be9497d9c0edc86f54b',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-False.svg': '82eeb0397410605523e66a12b68747ca',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-True.svg': 'ed5dc4da1724a5a829d1618be3e7c28f',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-False.svg': 'f8fe33991e6641ed3af9473235901f53',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-True.svg': 'f4124815a3f8ff5568443444621ea7ed',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-False.svg': 'ed5f8706b458daa3231e3d66c088c1c1',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-True.svg': '05ec74319594752382635eb819c61e1a'
+            'mutation/Tests/Mutation/zz_nt.bmp': '151197a072cf41782f7a563b9c7835fa',
+            'mutation/Tests/Mutation/zz_nt.eps': '5673fef3bdd0121d0a5a5e9d84746e7b',
+            'mutation/Tests/Mutation/zz_nt.gif': 'ffd504b515e8802be0421accdab17663',
+            'mutation/Tests/Mutation/zz_nt.jpg': '835bb0df30ac33166516835e93d8093d',
+            'mutation/Tests/Mutation/zz_nt.png': 'e9ad40ff6000198b1aa548dd89c8cc4e',
+            'mutation/Tests/Mutation/zz_nt.ps': '5673fef3bdd0121d0a5a5e9d84746e7b',
+            'mutation/Tests/Mutation/zz_nt.svg': '89399497a7a9ccf4a3bed6c5e9f62a28',
+            'mutation/Tests/Mutation/zz_nt.tif': 'd804ca950e045af0c84ff852bcd2c9bb',
+            'mutation/Tests/Mutation/zz_nt.tiff': '1c9aeb61eb111ffd7692a05d22b7bbb8',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-False.svg': '89399497a7a9ccf4a3bed6c5e9f62a28',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-True.svg': '188d09979d348f1c344cf4f93d919ca1',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-False.svg': 'fcd9fdd39d8d6fcd79fc937bf60a48b1',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-True.svg': '195d6bfc06d6db66fc1a9088e8d3ae0a',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-False.svg': 'b6171a7e62b3a3e8df76f47aa12b23fa',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-True.svg': '24e9514794c9c9edada080f79730d5f0',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-False.svg': '82370dba89998bc84c2bf135c44062f5',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-True.svg': '56a88474ce55bc9827186d7ededc8cda',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-False.svg': 'ff3f8bd99185349740f0008ab134451f',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-True.svg': '5458d42538c1d7a5e4eb099c021f9ccc',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-False.svg': 'd3aa4c4244668c5d126d69f0f1574cd9',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-True.svg': '54fa2ee45bbde283efd5682cf2c652e3',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-False.svg': 'b5956a5593fbcefa702fe135b98cfafe',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-True.svg': 'e31a381eebb6d839f86411f89cf40dad',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-False.svg': 'fe8397e108a06237339ba9a776115fe0',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-True.svg': '95bd4713eae9aa6cb90b51c2399ea65f'
         }
+
+        #new_hashes: dict = {}
 
         # PDFs have a creation date in them, so can't be checked by hash as they're different each time
         formats = ["PS", "EPS", "SVG", "JPG", "BMP", "GIF", "PNG", "TIFF", "TIF"] # , "PDF"
 
         for format in formats:
             if not self.extended_formats and format in ["JPG", "BMP", "GIF", "PNG", "TIFF", "TIF"]:
+                print(f"Skipping {format}")
                 continue
 
             with self.subTest(format=format):
                 file_name: str = f"mutation/Tests/Mutation/zz_nt.{format.lower()}"
                 self.mutation_plot_nt.draw_mismatches(file_name, output_format=format)
+                #new_hashes[file_name] = file_hash(file_name=file_name)
+                #print(f"\n{file_name}")
                 self.assertEqual(file_hash(file_name=file_name), hashes[file_name])
                 os.remove(file_name)
 
@@ -394,30 +399,35 @@ class MutationPlotTests(unittest.TestCase):
             with self.subTest(title=title, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons):
                 file_name: str = f"mutation/Tests/Mutation/zz_nt_title-{bool(title)}_apobec-{apobec}_gtoa-{g_to_a}_stop-{stop_codons}.svg"
                 self.mutation_plot_nt.draw_mismatches(file_name, title=title, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons)
+                #new_hashes[file_name] = file_hash(file_name=file_name)
                 self.assertEqual(file_hash(file_name=file_name), hashes[file_name])
                 os.remove(file_name)
 
+        #print(f"Extended: {self.extended_formats}")
+        #pprint(new_hashes)
 
     def test_mutation_plot_creates_valid_plot_aa(self):
         """ MutationPlot should create a valid plot """
 
-        #return
+        # return
 
         hashes: dict = {
-            'mutation/Tests/Mutation/zz_aa.bmp': '1a203b5b4ff33d19dea7565230d45a03',
-            'mutation/Tests/Mutation/zz_aa.eps': 'a626c585761825a7c42480fb0f89d7cc',
-            'mutation/Tests/Mutation/zz_aa.gif': '91db6b2334176c1194e16c11f9e5d950',
-            'mutation/Tests/Mutation/zz_aa.jpg': 'ee9c52e982400d03efa1e27b9fab3294',
-            'mutation/Tests/Mutation/zz_aa.png': 'afa2d62a43bba2c75fac67702752c5f7',
-            'mutation/Tests/Mutation/zz_aa.ps': 'a626c585761825a7c42480fb0f89d7cc',
-            'mutation/Tests/Mutation/zz_aa.svg': 'c3ecb8cd9b76f70631d9ac0e78318ac3',
-            'mutation/Tests/Mutation/zz_aa.tif': '15daa35eaa767dc1f2d055a0d04679c8',
-            'mutation/Tests/Mutation/zz_aa.tiff': '63103557e2ae5acf9959dc00e3dcb440',
-            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-False.svg': 'c3ecb8cd9b76f70631d9ac0e78318ac3',
-            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-True.svg': '6baa39bb672beef0a579180a21fddc7f',
-            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-False.svg': '223bbaff099f3267481c1b5076f0cf63',
-            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-True.svg': 'ee6576d9f7ef8cdc908507ae22df4d8a'
+            'mutation/Tests/Mutation/zz_aa.bmp': 'd038e467802cbee4cf57c7c760859626',
+            'mutation/Tests/Mutation/zz_aa.eps': '6f8c9cfd8d68773c8d0e7fda3bf0cf0f',
+            'mutation/Tests/Mutation/zz_aa.gif': '245d88d8ce2c1a3bb23b82da1e24cbe2',
+            'mutation/Tests/Mutation/zz_aa.jpg': 'cb545a04b4e0221bc8ad1179403432cf',
+            'mutation/Tests/Mutation/zz_aa.png': 'b5d55844b1a998198fe5e7ce04169615',
+            'mutation/Tests/Mutation/zz_aa.ps': '6f8c9cfd8d68773c8d0e7fda3bf0cf0f',
+            'mutation/Tests/Mutation/zz_aa.svg': 'b34d86ba82ea5bfcc0ff3a62d16ad0fe',
+            'mutation/Tests/Mutation/zz_aa.tif': '448e0e66e011cf7ac78cefcdfb668db9',
+            'mutation/Tests/Mutation/zz_aa.tiff': 'bee2bcacc14699e4e105fa831c009fe5',
+            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-False.svg': 'b34d86ba82ea5bfcc0ff3a62d16ad0fe',
+            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-True.svg': '94e1e63ae7b90b95eb10a7ffa2de3976',
+            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-False.svg': '271c0739a15cd925bfa67253ca9a380c',
+            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-True.svg': 'd7a4377fe71868b905c39100d9dca91a'
         }
+
+        #new_hashes: dict = {}
 
         # PDFs have a creation date in them, so can't be checked by hash as they're different each time
         formats = ["PS", "EPS", "SVG", "JPG", "BMP", "GIF", "PNG", "TIFF", "TIF"] # , "PDF"
@@ -429,7 +439,8 @@ class MutationPlotTests(unittest.TestCase):
             with self.subTest(format=format):
                 file_name: str = f"mutation/Tests/Mutation/zz_aa.{format.lower()}"
                 self.mutation_plot_aa.draw_mismatches(file_name, output_format=format)
-                hashes[file_name] = file_hash(file_name=file_name)
+                #new_hashes[file_name] = file_hash(file_name=file_name)
+                self.assertEqual(file_hash(file_name=file_name), hashes[file_name])
                 os.remove(file_name)
 
         titles: list = [None, "A Title"]
@@ -439,9 +450,11 @@ class MutationPlotTests(unittest.TestCase):
             with self.subTest(title=title, glycosylation=glycosylation):
                 file_name: str = f"mutation/Tests/Mutation/zz_aa_title-{bool(title)}_glycosylation-{glycosylation}.svg"
                 self.mutation_plot_aa.draw_mismatches(file_name, title=title, glycosylation=glycosylation)
-                hashes[file_name] = file_hash(file_name=file_name)
+                #new_hashes[file_name] = file_hash(file_name=file_name)
+                self.assertEqual(file_hash(file_name=file_name), hashes[file_name])
                 os.remove(file_name)
 
+        #pprint(new_hashes)
 
 if __name__ == '__main__':
     unittest.main()

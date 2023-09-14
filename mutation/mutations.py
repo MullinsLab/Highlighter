@@ -232,6 +232,9 @@ class Mutations:
                         matches[base_index] = []
 
                     matches[base_index].append(reference_index)
+                
+            if base_index in matches and len(matches[base_index]) == len(references):
+                matches[base_index].append(-1)
 
         return matches
     
@@ -298,7 +301,10 @@ class MutationPlot:
         self._seq_height: float = self.seq_name_font_size
         self.seq_gap: float = self._seq_height / 5 if seq_gap is None else seq_gap
 
-        self.match_plot_colors: list = ["red", "blue"]
+        self.match_plot_colors: list = ["#FF0000", "#537EFF", "#00CB85", "#000000", "#FFA500"]
+        self.match_plot_unique_color: str = "#EFE645"
+        self.match_plot_multiple_color: str = "#808080"
+
         self.mismatch_plot_colors: dict[str: [dict[str: str]]] = {
             "NT": {
                 "LANL": {
@@ -345,7 +351,7 @@ class MutationPlot:
         }
 
     def setup_drawing(self, *, output_format: str="svg", title: str=None, sort: str="similar", mark_width: float=1, scale: float=1):
-        """ Writes out the mutation plot to a file """
+        """ Setus up the drawing """
         
         self.output_format: str = output_format
 
@@ -378,36 +384,23 @@ class MutationPlot:
             self.sorted_keys = self._indexes_by_tree_order()
 
         else: 
-            self.sorted_keys = range(len(self.mismatches_list))
+            self.sorted_keys = range(len(self.matches_list))
 
         self._draw_title()
         if self.ruler:
             self._draw_ruler()
-    
-    def draw_mismatches(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1):
-
-        self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
-        
-        self.mismatches_list = self._mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
-        self.reference = self._mutations.references
-
-        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale)
-
-        self.scheme: str = scheme
-        self._current_scheme: dict = self.mismatch_plot_colors[self.type][self.scheme] if self.scheme in self.mismatch_plot_colors[self.type] else self.mismatch_plot_colors[self.type]["LANL"]
-
-        self._apobec: bool = apobec
-        self._g_to_a: bool = g_to_a
-        self._glycosylation: bool = glycosylation
-        self._stop_codons: bool = stop_codons
 
         for plot_index, seq_index in enumerate(self.sorted_keys):
-            matches = self.mismatches_list[seq_index]
 
             # Add label for sequence
             id = self.alignment[seq_index].id
-            if self.mark_reference and seq_index == self._mutations.references:
-                id += " (r)"
+            if self.mark_reference:
+                if isinstance(self._mutations.references, int):
+                    if seq_index == self._mutations.references:
+                        id += " (r)"
+                elif seq_index in self._mutations.references:
+                    id += f" (r{self._mutations.references.index(seq_index)+1})"
+                
 
             x: float = self.left_margin + self.plot_width + (inch/4)
             y: float = ((self._seq_count-(plot_index + .75)) * (self._seq_height + self.seq_gap))  + self.seq_gap + self._plot_floor
@@ -420,26 +413,39 @@ class MutationPlot:
             y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
             sequence_baseline: Line = Line(x1, y, x2, y, strokeColor=colors.lightgrey)
             self.drawing.add(sequence_baseline)
+    
+    def draw_mismatches(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1):
+        """ Draw mismatches compared to a reference sequence """
 
-            self._draw_marks(plot_index, matches, is_reference=(seq_index == self.reference))
+        self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
+        
+        self.matches_list = self._mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
+        self.references = self._mutations.references
+
+        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale)
+
+        self.scheme: str = scheme
+        self._current_scheme: dict = self.mismatch_plot_colors[self.type][self.scheme] if self.scheme in self.mismatch_plot_colors[self.type] else self.mismatch_plot_colors[self.type]["LANL"]
+
+        self._apobec: bool = apobec
+        self._g_to_a: bool = g_to_a
+        self._glycosylation: bool = glycosylation
+        self._stop_codons: bool = stop_codons
+
+        for plot_index, seq_index in enumerate(self.sorted_keys):
+            matches = self.matches_list[seq_index]
+            self._draw_marks_mismatch(plot_index, matches, is_reference=(seq_index == self.references))
 
         return _write(self.drawing, output_file, self.output_format, dpi=288*self.scale)
 
-    def _draw_marks(self, plot_index: int, matches: dict[int: list], is_reference: bool=False) -> None:
-        """ Draw mutations for a sequence """
+    def _draw_marks_mismatch(self, plot_index: int, matches: dict[int: list], is_reference: bool=False) -> None:
+        """ Draw marks for a mismatch sequence """
 
         for base, match_item in matches.items():
             for code in match_item:
                 if code in self._current_scheme:
-                    x1: float = self.left_margin + self._base_left(base)
-                    x2: float = self.left_margin + self._base_left(base+self.mark_width)
-
-                    y1: float = ((self._seq_count-plot_index) * (self._seq_height + self.seq_gap)) + (self.seq_gap/2) + self._plot_floor
-                    y2: float = ((self._seq_count-(plot_index+1)) * (self._seq_height + self.seq_gap)) + self.seq_gap + self._plot_floor
-
-                    base_color: Color = self._hex_to_color(self._current_scheme[code])
-                    base_mark: Rect = Rect(x1, y1, x2-x1, y2-y1, fillColor=base_color, strokeColor=base_color, strokeWidth=0.1)
-                    self.drawing.add(base_mark)
+                    color: Color = self._hex_to_color(self._current_scheme[code])
+                    self.drawing.add(self._base_mark(plot_index, base, color))
         
         # Symboloic markers need to be drawn second so they are on top of the rectangles
         for base, match_item in matches.items():
@@ -456,19 +462,61 @@ class MutationPlot:
                 if is_reference:
                     self.draw_circle(x, y)
                 else:
-                    if "Glycosylation" not in self.mismatches_list[self.reference].get(base, {}):
+                    if "Glycosylation" not in self.matches_list[self.references].get(base, {}):
                         self.draw_diamond(x, y, filled=True)
 
             elif "Stop codon" in match_item:
                 self.draw_diamond(x, y, color="#0000FF")
 
         if self.type == "AA" and self._glycosylation:
-            for base, match_item in self.mismatches_list[self.reference].items():
+            for base, match_item in self.matches_list[self.references].items():
                 if "Glycosylation" in match_item and "Glycosylation" not in matches.get(base, {}):
                     x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
                     y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
 
                     self.draw_diamond(x, y, color="#0000FF")
+
+    def draw_matches(self, output_file, *, output_format: str="svg", title: str=None, references: list[Union[str, int]]=0, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1):
+        """ Draw mismatches compared to a reference sequence """
+
+        self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
+        
+        self.matches_list = self._mutations.list_matches(references=references)
+        self.references = self._mutations.references
+
+        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale)
+
+        self.scheme: str = scheme
+        self._current_scheme: list = self.match_plot_colors
+
+        for plot_index, seq_index in enumerate(self.sorted_keys):
+            matches = self.matches_list[seq_index]
+            self._draw_marks_match(plot_index, matches, is_reference=(seq_index in self.references))
+
+        return _write(self.drawing, output_file, self.output_format, dpi=288*self.scale)
+
+    def _draw_marks_match(self, plot_index: int, matches: dict[int, list], is_reference: bool) -> None:
+        """ Draw the marks for a match sequence """
+
+        for base, match_item in matches.items():
+            if -1 in match_item:
+                color: Color = self._hex_to_color(self.match_plot_unique_color)
+                self.drawing.add(self._base_mark(plot_index, base, color))
+
+            else:
+                for code in match_item:
+                    color: Color = self._hex_to_color(self._current_scheme[code])
+                    self.drawing.add(self._base_mark(plot_index, base, color))
+
+    def _base_mark(self, plot_index, base, color):
+        """ Returns a mark for a particular base """
+        x1: float = self.left_margin + self._base_left(base)
+        x2: float = self.left_margin + self._base_left(base+self.mark_width)
+
+        y1: float = ((self._seq_count-plot_index) * (self._seq_height + self.seq_gap)) + (self.seq_gap/2) + self._plot_floor
+        y2: float = ((self._seq_count-(plot_index+1)) * (self._seq_height + self.seq_gap)) + self.seq_gap + self._plot_floor
+
+        return Rect(x1, y1, x2-x1, y2-y1, fillColor=color, strokeColor=color, strokeWidth=0.1)
 
     def _draw_title(self) -> None:
         """ Draw the title at the top of the plot """
@@ -583,7 +631,7 @@ class MutationPlot:
         max_width: float = 0
 
         for sequence in self.alignment:
-            width: float = stringWidth(f"{sequence.id} (r)", self.seq_name_font, self.seq_name_font_size)
+            width: float = stringWidth(f"{sequence.id} (r10)", self.seq_name_font, self.seq_name_font_size)
             if width > max_width:
                 max_width = width
         
@@ -600,7 +648,7 @@ class MutationPlot:
         """ Sort sequences by similarity to the reference sequence 
         returns list of indexes"""
 
-        return sorted(range(len(self.mismatches_list)), key=lambda x: len(self.mismatches_list[x]))
+        return sorted(range(len(self.matches_list)), key=lambda x: len(self.matches_list[x]))
     
     def draw_diamond(self, x: float, y: float, color: str="#FF00FF", filled: bool=False) -> None:
         """ Draw a rectangle on the plot """
