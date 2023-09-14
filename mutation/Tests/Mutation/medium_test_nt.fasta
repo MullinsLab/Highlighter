@@ -1,0 +1,10 @@
+>reference-1
+GTGCGGC_TTTT
+>reference-2
+ATGCGGCTTTTT
+>test-1
+GTGCGGCTTTTT
+>test-2
+ATGCGGC_TTTT
+>test-2
+ATGTGGC_TTTT

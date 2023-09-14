@@ -57,32 +57,20 @@ class SeqUtilsTests(unittest.TestCase):
         self.assertEqual(SeqUtils.codon_position('A-----GC', 7), 2)
         self.assertEqual(SeqUtils.codon_position('A-GC--A', 6),0)
 
-class MutationStaticTests(unittest.TestCase):
-    """ Test the static methods of the mutation object """
+class MutationStaticMismatchTests(unittest.TestCase):
+    """ Test the static mismatch methods of the mutation object """
 
     def test_get_mismatches_error_if_no_type_given(self):
         """ get_mismatches should error if no type is provided """
 
         with self.assertRaises(ValueError):
-            AlignInfo.Mutations.get_mismatches(sequence='ATGC', reference=['ATGC'])
-
-    def test_get_matches_error_if_no_type_given(self):
-        """ get_matches should error if no type is provided """
-
-        with self.assertRaises(ValueError):
-            AlignInfo.Mutations.get_matches(sequence='ATGC', reference='ATGC')
+            AlignInfo.Mutations.get_mismatches(sequence='ATGC', references=['ATGC'])
 
     def test_get_mismatches_error_if_no_sequence(self):
         """ get_mismatches should error if no sequence is provided """
 
         with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_mismatches(reference='ATGC', seq_type='NT')
-
-    def test_get_matches_error_if_no_sequence(self):
-        """ get_matches should error if no sequence is provided """
-
-        with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_matches(reference='ATGC', seq_type='NT')
+            AlignInfo.Mutations.get_mismatches(references='ATGC', seq_type='NT')
 
     def test_get_mismatches_error_if_no_reference(self):
         """ get_mismatches should error if no reference is provided """
@@ -90,125 +78,152 @@ class MutationStaticTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             AlignInfo.Mutations.get_mismatches(sequence='ATGC', seq_type='NT')
 
+    def test_get_mismatches_error_if_bad_types(self):
+        """ get_mismatches should error if bad types are provided """
+
+        with self.assertRaises(TypeError):
+            AlignInfo.Mutations.get_mismatches(sequence=1, references='ATGC', seq_type='NT')
+
+        with self.assertRaises(TypeError):
+            AlignInfo.Mutations.get_mismatches(sequence='ATGC', references=[], seq_type='NT')
+
+    def test_get_mismatches_error_if_different_lengths(self):
+        """ get_mismatches should error if the sequence and reference are different lengths """
+
+        with self.assertRaises(ValueError):
+            AlignInfo.Mutations.get_mismatches(sequence='ATGC', references='ATG', seq_type='NT')
+
+    def test_get_mismatches_succeeds_with_mixed_types(self):
+        """ get_mismatches should succeed with mixed types """
+
+        try:
+            AlignInfo.Mutations.get_mismatches(sequence='ATGC', references=Seq('ATGC'), seq_type='NT')
+        except:
+            self.fail('get_mismatches failed with mixed types')
+
+        try:
+            AlignInfo.Mutations.get_mismatches(sequence=SeqRecord(Seq('ATGC')), references='ATGC', seq_type='NT')
+        except:
+            self.fail('get_mismatches failed with mixed types')
+
+    def test_get_mismatches_returns_dict(self):
+        """ get_mismatches should return a dictionary """
+
+        self.assertEqual(type(AlignInfo.Mutations.get_mismatches(sequence='ATGC', references='ATGC', seq_type='NT')), dict)
+
+    def test_get_mismatches_returns_empty_dict_given_same_sequence_and_reference(self):
+        """ get_mismatches should return an empty dictionary if the sequence and reference are the same """
+
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(sequence='ATGC', references='ATGC', seq_type='NT'), {})
+
+    def test_get_mismatches_returns_non_empty_dict_given_different_sequence_and_reference(self):
+        """ get_mismatches should return a non-empty dictionary if the sequence and reference are different """
+
+        self.assertNotEqual(AlignInfo.Mutations.get_mismatches(sequence='ATGC', references='ATGG', seq_type='NT'), {})
+
+    def test_get_mismatches_returns_correct_glycosylation_sites(self):
+        """ get_mismatches should return a dictionary with the correct glycosylation sites """
+
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='GNS-SQ', sequence='GNS-SQ', seq_type='AA', glycosylation=True), {1: ['Glycosylation']})
+
+    def test_get_mismatches_returns_correct_stop_codons(self):
+        """ get_mismatches should return a dictionary with the correct stop codons """
+
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='GTAA-', sequence='GTAA-', seq_type='NT', stop_codons=True), {})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='GGGTAA-', sequence='GGGTAA-', seq_type='NT', stop_codons=True), {3: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='GG--GTAA-', sequence='GG--GTAA-', seq_type='NT', stop_codons=True), {5: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='GGGUAG-', sequence='GGGUAG-', seq_type='NT', stop_codons=True), {3: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='TAG', sequence='TAG', seq_type='NT', stop_codons=True), {0: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='TGA', sequence='TGA', seq_type='NT', stop_codons=True), {0: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='TGATAG', sequence='TGATAG', seq_type='NT', stop_codons=True), {0: ['Stop codon'], 3: ['Stop codon']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='TGATAG', sequence='TGATAG', seq_type='NT', stop_codons=False), {})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='TGATAG', sequence='TGATAG', seq_type='NT'), {})
+
+    def test_get_mismatches_returns_correct_dict_given_different_sequence_and_reference_nt(self):
+        """ get_mismatches should return a dictionary with the correct keys and values """
+
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(g_to_a=True, references='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A', 'G->A mutation'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(apobec=True, references='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(g_to_a=True, apobec=True, references='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A', 'G->A mutation', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
+
+    def test_get_mismatches_returns_correct_dict_given_different_sequence_and_reference_aa(self):
+        """ get_mismatches should return a dictionary with the correct keys and values """
+
+        self.assertEqual(AlignInfo.Mutations.get_mismatches(references='MRVMEIRRNYQHL--', sequence='MRAMK-RRNYQHL--', seq_type='AA'), {2: ['A'], 4: ['K'], 5: ['Gap']})
+
+
+class MutationStaticMatchTests(unittest.TestCase):
+    """ Test the static match methods of the mutation object """
+
+    def test_get_matches_error_if_no_type_given(self):
+        """ get_matches should error if no type is provided """
+
+        with self.assertRaises(ValueError):
+            AlignInfo.Mutations.get_matches(sequence='ATGC', references='ATGC')
+
+    def test_get_matches_error_if_no_sequence(self):
+        """ get_matches should error if no sequence is provided """
+
+        with self.assertRaises(TypeError):
+            AlignInfo.Mutations.get_matches(references='ATGC', seq_type='NT')
+
     def test_get_matches_error_if_no_reference(self):
         """ get_matches should error if no reference is provided """
     
         with self.assertRaises(TypeError):
             AlignInfo.Mutations.get_matches(sequence='ATGC', seq_type='NT')
 
-    def test_get_mismatches_error_if_bad_types(self):
-        """ get_mismatches should error if bad types are provided """
-
-        with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_mismatches(sequence=1, reference='ATGC', seq_type='NT')
-
-        with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_mismatches(sequence='ATGC', reference=[], seq_type='NT')
-
     def test_get_matches_error_if_bad_types(self):
         """ get_matches should error if bad types are provided """
 
         with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_matches(sequence=1, reference='ATGC', seq_type='NT')
+            AlignInfo.Mutations.get_matches(sequence=1, references='ATGC', seq_type='NT')
 
         with self.assertRaises(TypeError):
-            AlignInfo.Mutations.get_matches(sequence='ATGC', reference=1, seq_type='NT')
-
-    def test_get_mismatches_error_if_different_lengths(self):
-        """ get_mismatches should error if the sequence and reference are different lengths """
-
-        with self.assertRaises(ValueError):
-            AlignInfo.Mutations.get_mismatches(sequence='ATGC', reference='ATG', seq_type='NT')
+            AlignInfo.Mutations.get_matches(sequence='ATGC', references=1, seq_type='NT')
 
     def test_get_matches_error_if_different_lengths(self):
         """ get_matches should error if the sequence and reference are different lengths """
 
         with self.assertRaises(ValueError):
-            AlignInfo.Mutations.get_matches(sequence='ATGC', reference='ATG', seq_type='NT')
-
-    def test_get_mismatches_succeeds_with_mixed_types(self):
-        """ get_mismatches should succeed with mixed types """
-
-        try:
-            AlignInfo.Mutations.get_mismatches(sequence='ATGC', reference=Seq('ATGC'), seq_type='NT')
-        except:
-            self.fail('get_mismatches failed with mixed types')
-
-        try:
-            AlignInfo.Mutations.get_mismatches(sequence=SeqRecord(Seq('ATGC')), reference='ATGC', seq_type='NT')
-        except:
-            self.fail('get_mismatches failed with mixed types')
+            AlignInfo.Mutations.get_matches(sequence='ATGC', references='ATG', seq_type='NT')
 
     def test_get_matches_succeeds_with_mixed_types(self):
         """ get_matches should succeed with mixed types """
 
         try:
-            AlignInfo.Mutations.get_matches(sequence='ATGC', reference=Seq('ATGC'), seq_type='NT')
+            AlignInfo.Mutations.get_matches(sequence='ATGC', references=Seq('ATGC'), seq_type='NT')
         except:
             self.fail('get_matches failed with mixed types')
 
         try:
-            AlignInfo.Mutations.get_matches(sequence=SeqRecord(Seq('ATGC')), reference='ATGC', seq_type='NT')
+            AlignInfo.Mutations.get_matches(sequence=SeqRecord(Seq('ATGC')), references='ATGC', seq_type='NT')
         except:
             self.fail('get_matches failed with mixed types')
-
-    def test_get_mismatches_returns_dict(self):
-        """ get_mismatches should return a dictionary """
-
-        self.assertEqual(type(AlignInfo.Mutations.get_mismatches(sequence='ATGC', reference='ATGC', seq_type='NT')), dict)
 
     def test_get_matches_returns_dict(self):
         """ get_matches should return a dictionary """
 
-        self.assertEqual(type(AlignInfo.Mutations.get_matches(sequence='ATGC', reference='ATGC', seq_type='NT')), dict)
-
-    def test_get_mismatches_returns_empty_dict_given_same_sequence_and_reference(self):
-        """ get_mismatches should return an empty dictionary if the sequence and reference are the same """
-
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(sequence='ATGC', reference='ATGC', seq_type='NT'), {})
-
-    def test_get_mismatches_returns_non_empty_dict_given_different_sequence_and_reference(self):
-        """ get_mismatches should return a non-empty dictionary if the sequence and reference are different """
-
-        self.assertNotEqual(AlignInfo.Mutations.get_mismatches(sequence='ATGC', reference='ATGG', seq_type='NT'), {})
+        self.assertEqual(type(AlignInfo.Mutations.get_matches(sequence='ATGC', references='ATGC', seq_type='NT')), dict)
 
     def test_get_matches_returns_non_empty_dict_given_different_sequence_and_reference(self):
         """ get_mismatches should return a non-empty dictionary if the sequence and reference are different """
 
-        self.assertNotEqual(AlignInfo.Mutations.get_matches(sequence='ATGC', reference='ATGG', seq_type='NT'), {})
+        self.assertNotEqual(AlignInfo.Mutations.get_matches(sequence='ATGC', references='ATGG', seq_type='NT'), {})
 
-    def test_get_mismatches_returns_correct_glycosylation_sites(self):
-        """ get_mismatches should return a dictionary with the correct glycosylation sites """
+    def test_get_matches_returns_correct_matches_given_different_sequence_and_reference(self):
+        """ get_matches should return a dictionary with the correct keys and values """
 
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='GNS-SQ', sequence='GNS-SQ', seq_type='AA', glycosylation=True), {1: ['Glycosylation']})
+        self.assertEqual(AlignInfo.Mutations.get_matches(references='GTGCGGC-', sequence='GTGCGGCT', seq_type='NT'), {7: [0]})
 
-    def test_get_mismatches_returns_correct_stop_codons(self):
-        """ get_mismatches should return a dictionary with the correct stop codons """
+    def test_get_matches_returns_correct_matches_given_multiple_references(self):
+        """ get_matches should return a dictionary with the correct keys and values """
 
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='GTAA-', sequence='GTAA-', seq_type='NT', stop_codons=True), {})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='GGGTAA-', sequence='GGGTAA-', seq_type='NT', stop_codons=True), {3: ['Stop codon']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='GG--GTAA-', sequence='GG--GTAA-', seq_type='NT', stop_codons=True), {5: ['Stop codon']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='GGGUAG-', sequence='GGGUAG-', seq_type='NT', stop_codons=True), {3: ['Stop codon']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='TAG', sequence='TAG', seq_type='NT', stop_codons=True), {0: ['Stop codon']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='TGA', sequence='TGA', seq_type='NT', stop_codons=True), {0: ['Stop codon']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='TGATAG', sequence='TGATAG', seq_type='NT', stop_codons=True), {0: ['Stop codon'], 3: ['Stop codon']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='TGATAG', sequence='TGATAG', seq_type='NT', stop_codons=False), {})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='TGATAG', sequence='TGATAG', seq_type='NT'), {})
+        self.assertEqual(AlignInfo.Mutations.get_matches(references=['GTGCGGC-', 'GTGTGGCT'], sequence='GTGCCGCT', seq_type='NT'), {3: [1], 4: [0, 1], 7: [0]})
 
-    def test_get_mismatches_returns_correct_dict_given_different_sequence_and_reference_nt(self):
-        """ get_mismatches should return a dictionary with the correct keys and values """
-
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(g_to_a=True, reference='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A', 'G->A mutation'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(apobec=True, reference='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A'], 6: ['Gap'], 7: ['T']})
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(g_to_a=True, apobec=True, reference='GTGCGGC-', sequence='AATGCA-T', seq_type='NT'), {0: ['A', 'G->A mutation', 'APOBEC'], 1: ['A'], 2: ['T'], 3: ['G'], 4: ['C'], 5: ['A', 'G->A mutation'], 6: ['Gap'], 7: ['T']})
-
-    def test_get_mismatches_returns_correct_dict_given_different_sequence_and_reference_aa(self):
-        """ get_mismatches should return a dictionary with the correct keys and values """
-
-        self.assertEqual(AlignInfo.Mutations.get_mismatches(reference='MRVMEIRRNYQHL--', sequence='MRAMK-RRNYQHL--', seq_type='AA'), {2: ['A'], 4: ['K'], 5: ['Gap']})
-        
-class MutationObjectTests(unittest.TestCase):
+   
+class MutationObjectMismatchTests(unittest.TestCase):
     """ Tests that use the mutation object """
 
     def setUp(self):
@@ -217,17 +232,29 @@ class MutationObjectTests(unittest.TestCase):
         self.short_align = AlignIO.read(pathlib.PurePath(pathlib.Path(__file__).parent.resolve(), 'Mutation/short_test_nt.fasta'), 'fasta')
         self.short_mutations = AlignInfo.Mutations(self.short_align, seq_type='NT')
 
+        self.medium_align = AlignIO.read(pathlib.PurePath(pathlib.Path(__file__).parent.resolve(), 'Mutation/medium_test_nt.fasta'), 'fasta')
+        self.medium_mutations = AlignInfo.Mutations(self.medium_align, seq_type='NT')
+
     def test_list_mismatches_raises_error_on_bad_reference(self):
         """ list_mismatches should raise an error if the reference is not in the alignment """
 
         with self.assertRaises(IndexError):
-            self.short_mutations.list_mismatches(reference='bad_test')
+            self.short_mutations.list_mismatches(references='bad_test')
 
         with self.assertRaises(IndexError):
-            self.short_mutations.list_mismatches(reference=7)
+            self.short_mutations.list_mismatches(references=7)
+
+    def test_list_matches_raises_error_on_bad_reference(self):
+        """ list_matches should raise an error if the reference is not in the alignment """
+
+        with self.assertRaises(IndexError):
+            self.short_mutations.list_matches(references='bad_test')
+
+        with self.assertRaises(IndexError):
+            self.short_mutations.list_matches(references=7)
 
     def test_list_mismatches_returns_correct_list(self):
-        """ list_mismatches should return a list of the correct length """
+        """ list_mismatches should return a the correct list """
 
         result: dict = {
             0: {
@@ -252,12 +279,15 @@ class MutationObjectTests(unittest.TestCase):
             }
         }
 
-        for reference in [0, 1]:
-            for apobec in [False, True]:
-                for g_to_a in [False, True]:
-                    with self.subTest(reference=reference, apobec=apobec, g_to_a=g_to_a):
-                        self.assertEqual(self.short_mutations.list_mismatches(reference=reference, apobec=apobec, g_to_a=g_to_a), result[reference][apobec][g_to_a])
+        for reference, apobec, g_to_a in product([0, 1], [False, True], [False, True]):
+            with self.subTest(references=reference, apobec=apobec, g_to_a=g_to_a):
+                self.assertEqual(self.short_mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a), result[reference][apobec][g_to_a])
 
+    def test_list_matches_returns_correct_list(self):
+        """ list_matches should return a the correct list """
+
+        result: list = [{}, {}, {0: [1], 7: [0]}, {0: [0], 7: [1]}, {0: [0], 3: [0, 1], 7: [1]}]
+        self.assertEqual(self.medium_mutations.list_matches(references=[0, 1]), result)
 
 class MutationPlotStaticTests(unittest.TestCase):
     """ Tests that use the static methods of the MutationPlot class """
@@ -312,7 +342,7 @@ class MutationPlotTests(unittest.TestCase):
     def test_mutation_plot_creates_valid_plot_nt(self):
         """ MutationPlot should create a valid plot """
 
-        return
+        #return
 
         hashes: dict = {
             'mutation/Tests/Mutation/zz_nt.bmp': '81c8c577e086484c01094058eabfca59',
@@ -351,7 +381,7 @@ class MutationPlotTests(unittest.TestCase):
 
             with self.subTest(format=format):
                 file_name: str = f"mutation/Tests/Mutation/zz_nt.{format.lower()}"
-                self.mutation_plot_nt.draw_matches(file_name, output_format=format)
+                self.mutation_plot_nt.draw_mismatches(file_name, output_format=format)
                 self.assertEqual(file_hash(file_name=file_name), hashes[file_name])
                 os.remove(file_name)
 
@@ -363,7 +393,7 @@ class MutationPlotTests(unittest.TestCase):
         for title, apobec, g_to_a, stop_codons in product(titles, apobecs, g_to_as, stop_codonss):
             with self.subTest(title=title, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons):
                 file_name: str = f"mutation/Tests/Mutation/zz_nt_title-{bool(title)}_apobec-{apobec}_gtoa-{g_to_a}_stop-{stop_codons}.svg"
-                self.mutation_plot_nt.draw_matches(file_name, title=title, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons)
+                self.mutation_plot_nt.draw_mismatches(file_name, title=title, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons)
                 self.assertEqual(file_hash(file_name=file_name), hashes[file_name])
                 os.remove(file_name)
 
@@ -371,7 +401,7 @@ class MutationPlotTests(unittest.TestCase):
     def test_mutation_plot_creates_valid_plot_aa(self):
         """ MutationPlot should create a valid plot """
 
-        return
+        #return
 
         hashes: dict = {
             'mutation/Tests/Mutation/zz_aa.bmp': '1a203b5b4ff33d19dea7565230d45a03',
@@ -398,7 +428,7 @@ class MutationPlotTests(unittest.TestCase):
 
             with self.subTest(format=format):
                 file_name: str = f"mutation/Tests/Mutation/zz_aa.{format.lower()}"
-                self.mutation_plot_aa.draw_matches(file_name, output_format=format)
+                self.mutation_plot_aa.draw_mismatches(file_name, output_format=format)
                 hashes[file_name] = file_hash(file_name=file_name)
                 os.remove(file_name)
 
@@ -408,7 +438,7 @@ class MutationPlotTests(unittest.TestCase):
         for title, glycosylation in product(titles, glycosylations):
             with self.subTest(title=title, glycosylation=glycosylation):
                 file_name: str = f"mutation/Tests/Mutation/zz_aa_title-{bool(title)}_glycosylation-{glycosylation}.svg"
-                self.mutation_plot_aa.draw_matches(file_name, title=title, glycosylation=glycosylation)
+                self.mutation_plot_aa.draw_mismatches(file_name, title=title, glycosylation=glycosylation)
                 hashes[file_name] = file_hash(file_name=file_name)
                 os.remove(file_name)
 
