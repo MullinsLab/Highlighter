@@ -3,8 +3,18 @@ import mutations
 import Bio
 from Bio import AlignIO, Phylo
 from Bio.Align import AlignInfo
+from Bio.Align.AlignInfo import SummaryInfo
 from Bio.Phylo import NexusIO, BaseTree
 from Bio.Graphics import MutationPlot
+
+
+align = AlignIO.read("mutation/Tests/Private/V704_0011_240-241_REN_highlighter.fasta", "fasta")
+align_info = SummaryInfo(align)
+print(align_info.gap_consensus(threshold=.5))
+if "X" in align_info.gap_consensus():
+    print("X is in consensus")
+    print(f"There are {align_info.gap_consensus(ambiguous='X').count('X')} X's in the consensus")
+exit()
 
 
 # V704_0011_240-241_REN
