@@ -342,7 +342,7 @@ class MutationPlotTests(unittest.TestCase):
     def test_mutation_plot_creates_valid_plot_nt(self):
         """ MutationPlot should create a valid plot """
 
-        # return
+        return
 
         hashes: dict = {
             'mutation/Tests/Mutation/zz_nt.bmp': '151197a072cf41782f7a563b9c7835fa',
@@ -409,7 +409,7 @@ class MutationPlotTests(unittest.TestCase):
     def test_mutation_plot_creates_valid_plot_aa(self):
         """ MutationPlot should create a valid plot """
 
-        # return
+        return
 
         hashes: dict = {
             'mutation/Tests/Mutation/zz_aa.bmp': 'd038e467802cbee4cf57c7c760859626',

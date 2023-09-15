@@ -23,7 +23,10 @@ if True:
     align = AlignIO.read("mutation/Tests/Mutation/highlighter_nt.fasta", "fasta")
 
     plot = MutationPlot(align)
-    plot.draw_matches("highlighter_nt.svg", references = [0, 1])
+    plot.draw_matches("highlighter_nt.svg", references = [0, 1, 2], mark_width=1, sort=None)
+
+    mutations = AlignInfo.Mutations(align, seq_type="NT")
+    mutations.export_matches(output_file="highlighter_nt.txt", references=[0, 1, 2])
 
 # V704_0011_240-241_REN
 if False:

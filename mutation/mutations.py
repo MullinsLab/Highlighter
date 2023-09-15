@@ -226,17 +226,76 @@ class Mutations:
             return matches
 
         for base_index in range(len(sequence)):
+            matches[base_index] = []
             for reference_index, reference in enumerate(references):
-                if reference[base_index] != sequence[base_index]:
-                    if base_index not in matches:
-                        matches[base_index] = []
-
+                if reference[base_index] == sequence[base_index]:
                     matches[base_index].append(reference_index)
-                
-            if base_index in matches and len(matches[base_index]) == len(references):
-                matches[base_index].append(-1)
+
+            if not matches[base_index]:
+                matches[base_index].append("Unique")
+
+            elif len(matches[base_index]) == len(references):
+                del matches[base_index]
 
         return matches
+    
+    def export_matches(self, output_file, *, references: tuple[Union[int, str]]=0) -> None:
+        """ Export matches to a .txt file """
+
+        output: str = ""
+        matches = self.list_matches(references=references)
+        
+        for sequence_index, sequence in enumerate(self.alignment):
+            matched: dict = {}
+
+            for base, codes in matches[sequence_index].items():
+                if "Unique" in codes:
+                    if "Unique" not in matched:
+                        matched["Unique"] = []
+                    
+                    matched["Unique"].append(base+1)
+                
+                elif len(codes) > 1:
+                    if "Multiple" not in matched:
+                        matched["Multiple"] = []
+                    
+                    matched["Multiple"].append(base+1)
+
+                else:
+                    if codes[0] not in matched:
+                        matched[codes[0]] = []
+                    
+                    matched[codes[0]].append(base+1)
+
+            if sequence.id == "696": 
+                print(matched)
+                print(matches[sequence_index])
+                print(references)
+
+            if sequence_index in self.references:
+                output += f"{sequence.id} (R{self.references.index(sequence_index)+1})\n"
+            else:
+                output += f"{sequence.id}\n"
+
+            for code in list(range(10)) + ["Unique", "Multiple"]:
+                if code not in matched:
+                    continue
+
+                if code == "Unique":
+                    output += f"Unique in query "
+
+                elif code == "Multiple":
+                    output += f"Multiple matches "
+                    
+                else:
+                    output += f"R{code+1} "
+
+                output += f"[{' '.join([str(thing) for thing in matched[code]])}]\n"
+
+            output += "\n"
+
+        with open(output_file, mode="wt") as file:
+            file.write(output)
     
 AlignInfo.Mutations = Mutations
 
@@ -301,7 +360,18 @@ class MutationPlot:
         self._seq_height: float = self.seq_name_font_size
         self.seq_gap: float = self._seq_height / 5 if seq_gap is None else seq_gap
 
-        self.match_plot_colors: list = ["#FF0000", "#537EFF", "#00CB85", "#000000", "#FFA500"]
+        self.match_plot_colors: dict[str: dict] = {
+            "ML": {
+                "references": ["#FF0000", "#537EFF", "#00CB85", "#000000", "#FFA500"],
+                "unique": "#EFE645",
+                "multiple": "#808080",
+            },
+            "LANL": {
+                "references": ["#ED1C24", "#235192", "#FFC20E", "#00A651", "#8DC73F"],
+                "unique": "#000000",
+                "multiple": "#666666",
+            }
+        }
         self.match_plot_unique_color: str = "#EFE645"
         self.match_plot_multiple_color: str = "#808080"
 
@@ -350,7 +420,7 @@ class MutationPlot:
             }
         }
 
-    def setup_drawing(self, *, output_format: str="svg", title: str=None, sort: str="similar", mark_width: float=1, scale: float=1):
+    def setup_drawing(self, *, plot_type: str, output_format: str="svg", title: str=None, sort: str="similar", mark_width: float=1, scale: float=1, scheme: str="LANL"):
         """ Setus up the drawing """
         
         self.output_format: str = output_format
@@ -408,10 +478,15 @@ class MutationPlot:
             self.drawing.add(sequence_str, id)
 
             # Add base line for sequence
+            if plot_type == "match" and seq_index in self._mutations.references:
+                color: Color = self._hex_to_color(self._current_scheme[self._mutations.references.index(seq_index)])
+            else:
+                color: Color = colors.lightgrey
+
             x1: float = self.left_margin
             x2: float = self.left_margin + self.plot_width
             y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
-            sequence_baseline: Line = Line(x1, y, x2, y, strokeColor=colors.lightgrey)
+            sequence_baseline: Line = Line(x1, y, x2, y, strokeColor=color)
             self.drawing.add(sequence_baseline)
     
     def draw_mismatches(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1):
@@ -422,7 +497,7 @@ class MutationPlot:
         self.matches_list = self._mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
         self.references = self._mutations.references
 
-        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale)
+        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="mismatch")
 
         self.scheme: str = scheme
         self._current_scheme: dict = self.mismatch_plot_colors[self.type][self.scheme] if self.scheme in self.mismatch_plot_colors[self.type] else self.mismatch_plot_colors[self.type]["LANL"]
@@ -484,10 +559,12 @@ class MutationPlot:
         self.matches_list = self._mutations.list_matches(references=references)
         self.references = self._mutations.references
 
-        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale)
-
         self.scheme: str = scheme
-        self._current_scheme: list = self.match_plot_colors
+        self._current_scheme: list = self.match_plot_colors[self.scheme]["references"]
+        self._current_unique_color: str = self.match_plot_colors[self.scheme]["unique"]
+        self._current_multiple_color: str = self.match_plot_colors[self.scheme]["multiple"]
+
+        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="match", scheme=scheme)
 
         for plot_index, seq_index in enumerate(self.sorted_keys):
             matches = self.matches_list[seq_index]
@@ -499,8 +576,12 @@ class MutationPlot:
         """ Draw the marks for a match sequence """
 
         for base, match_item in matches.items():
-            if -1 in match_item:
-                color: Color = self._hex_to_color(self.match_plot_unique_color)
+            if "Unique" in match_item:
+                color: Color = self._hex_to_color(self._current_unique_color)
+                self.drawing.add(self._base_mark(plot_index, base, color))
+
+            elif len(match_item) > 1:
+                color: Color = self._hex_to_color(self._current_multiple_color)
                 self.drawing.add(self._base_mark(plot_index, base, color))
 
             else:
