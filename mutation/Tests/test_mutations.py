@@ -346,6 +346,44 @@ class MutationPlotTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             MutationPlot(self.align_nt, tree='bad_tree')
 
+    def test_mutation_plot_draw_matches_fails_init_with_bad_scheme(self):
+        """ MutationPlot.draw_matches should fail to initialize if a bad scheme is provided """
+
+        with self.assertRaises(TypeError):
+            self.mutation_plot_nt.draw_matches("mutation/Tests/Mutation/matches.png", scheme=1)
+
+        with self.assertRaises(ValueError):
+            self.mutation_plot_nt.draw_matches("mutation/Tests/Mutation/matches.png", scheme="bad_scheme")
+
+        with self.assertRaises(ValueError):
+            self.mutation_plot_nt.draw_matches("mutation/Tests/Mutation/matches.png", scheme={})
+
+        with self.assertRaises(ValueError):
+            self.mutation_plot_nt.draw_matches("mutation/Tests/Mutation/matches.png", scheme={"references": {}, "multiple": "#808080", "unique": "#EFE645"})
+
+        with self.assertRaises(ValueError):
+            self.mutation_plot_nt.draw_matches("mutation/Tests/Mutation/matches.png", scheme={"references": {"#808080"}, "multiple": "", "unique": "#EFE645"})
+
+        with self.assertRaises(ValueError):
+            self.mutation_plot_nt.draw_matches("mutation/Tests/Mutation/matches.png", scheme={"references": {"#808080"}, "multiple": "#808080", "unique": ""})
+
+    def test_mutation_plot_draw_matches_creates_valid_plot_with_custom_scheme(self):
+        """ MutationPlot should create a valid plot with a custom scheme """
+
+        self.mutation_plot_hiv_nt.draw_matches("mutation/Tests/Mutation/matches.png", output_format="PNG", sort="tree", references=[0,5], scheme={"references": ["#FF0000", "#537EFF"], "multiple": "#808080", "unique": "#EFE64"})
+        self.assertEqual(file_hash(file_name="mutation/Tests/Mutation/matches.png"), "48e169af50f68757ae081e0b97131ca9")
+        os.remove("mutation/Tests/Mutation/matches.png")
+
+        with open("mutation/Tests/Mutation/hiv_seq_1.txt", "r") as file:
+            reference_1: Seq = Seq(file.read())
+
+        with open("mutation/Tests/Mutation/hiv_seq_2.txt", "r") as file:
+            reference_2: Seq = Seq(file.read())
+
+        self.mutation_plot_hiv_nt.draw_matches("mutation/Tests/Mutation/matches.png", output_format="PNG", sort="tree", references=[reference_1,reference_2], scheme={"references": ["#FF0000", "#537EFF"], "multiple": "#808080", "unique": "#EFE64"})
+        self.assertEqual(file_hash(file_name="mutation/Tests/Mutation/matches.png"), "3003132870ab8317b0bef2995e03cd56")
+        os.remove("mutation/Tests/Mutation/matches.png")
+
     def test_mutation_plot_creates_valid_plot_nt(self):
         """ MutationPlot should create a valid plot """
 

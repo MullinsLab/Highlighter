@@ -88,6 +88,9 @@ class Mutations:
         if seq_type not in ("NT", "AA"):
             raise ValueError("type must be provided (either 'NT' or 'AA')")
 
+        sequence = sequence.replace("\n", "")
+        references = references.replace("\n", "")
+
         mismatches: dict = {}
 
         if sequence == references and (seq_type == "NT" and not stop_codons) and (seq_type == "AA" and not glycosylation):
@@ -158,7 +161,7 @@ class Mutations:
 
         for reference in references:
             if isinstance(reference, str):
-                self.references.append(self.get_seq_index_by_id(reference))
+                self.references.append(self.get_seq_index_by_id(reference).replace("\n", ""))
 
             elif isinstance(reference, int):
                 if reference >= len(self.alignment):
@@ -167,7 +170,7 @@ class Mutations:
                 self.references.append(reference)
 
             elif isinstance(reference, Seq):
-                self.references.append(reference)
+                self.references.append(str(reference).replace("\n", ""))
 
             elif isinstance(reference, dict):
                 if "sequence" not in reference or "color" not in reference:
@@ -205,9 +208,9 @@ class Mutations:
             raise ValueError("type must be provided (either 'NT' or 'AA')")
         
         if isinstance(sequence, Seq):
-                sequence = str(sequence)
+                sequence = str(sequence).replace("\n", "")
         elif isinstance(sequence, SeqRecord):
-                sequence = str(sequence.seq)
+                sequence = str(sequence.seq).replace("\n", "")
         elif not isinstance(sequence, str):
                 raise TypeError(f"Expected sequence to be a string, Seq, or SeqRecord, got {type(sequence)}")
         
@@ -218,9 +221,11 @@ class Mutations:
 
         for reference in references:
             if isinstance(reference, Seq):
-                reference = str(reference)
+                reference = str(reference).replace("\n", "")
             elif isinstance(reference, SeqRecord):
-                reference = str(reference.seq)
+                reference = str(reference.seq).replace("\n", "")
+            elif isinstance(reference, str):
+                reference = reference.replace("\n", "")
             elif not isinstance(reference, str):
                 raise TypeError(f"Expected reference to be a string, Seq, or SeqRecord, got {type(reference)}")
             
@@ -387,8 +392,6 @@ class MutationPlot:
                 "multiple": "#666666",
             }
         }
-        self.match_plot_unique_color: str = "#EFE645"
-        self.match_plot_multiple_color: str = "#808080"
 
         self.mismatch_plot_colors: dict[str: [dict[str: str]]] = {
             "NT": {
@@ -435,7 +438,7 @@ class MutationPlot:
             }
         }
 
-    def setup_drawing(self, *, plot_type: str, output_format: str="svg", title: str=None, sort: str="similar", mark_width: float=1, scale: float=1, scheme: str="LANL"):
+    def _setup_drawing(self, *, plot_type: str, output_format: str="svg", title: str=None, sort: str="similar", mark_width: float=1, scale: float=1):
         """ Setus up the drawing """
         
         self.output_format: str = output_format
@@ -486,17 +489,37 @@ class MutationPlot:
                 elif seq_index in self._mutations.references:
                     id += f" (r{self._mutations.references.index(seq_index)+1})"
                 
-
             x: float = self.left_margin + self.plot_width + (inch/4)
             y: float = ((self._seq_count-(plot_index + .75)) * (self._seq_height + self.seq_gap))  + self.seq_gap + self._plot_floor
             sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
             self.drawing.add(sequence_str, id)
 
+            color: Color = None
+
             # Add base line for sequence
-            if plot_type == "match" and seq_index in self._mutations.references:
-                color: Color = self._hex_to_color(self._current_scheme[self._mutations.references.index(seq_index)])
-            else:
-                color: Color = colors.lightgrey
+            if plot_type == "match":
+                if seq_index in self._mutations.references:
+                    color = self._hex_to_color(self._current_scheme[self._mutations.references.index(seq_index)])
+
+                else:
+                    sequence: str = ""
+                    if isinstance(self.alignment[seq_index], Seq):
+                        sequence = str(self.alignment[seq_index])
+
+                    elif isinstance(self.alignment[seq_index], SeqRecord):
+                        sequence = str(self.alignment[seq_index].seq)
+
+                    elif isinstance(self.alignment[seq_index], str):
+                        sequence = self.alignment[seq_index]
+
+                    sequence = sequence.replace("\n", "")
+                    
+                    if sequence.replace in self._mutations.references:
+                        print("got sequence")
+                        color = self._hex_to_color(self._current_scheme[self._mutations.references.index(sequence)])
+
+            if not color:
+                color = colors.lightgrey
 
             x1: float = self.left_margin
             x2: float = self.left_margin + self.plot_width
@@ -512,7 +535,7 @@ class MutationPlot:
         self.matches_list = self._mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
         self.references = self._mutations.references
 
-        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="mismatch")
+        self._setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="mismatch")
 
         self.scheme: str = scheme
         self._current_scheme: dict = self.mismatch_plot_colors[self.type][self.scheme] if self.scheme in self.mismatch_plot_colors[self.type] else self.mismatch_plot_colors[self.type]["LANL"]
@@ -566,7 +589,7 @@ class MutationPlot:
 
                     self.draw_diamond(x, y, color="#0000FF")
 
-    def draw_matches(self, output_file, *, output_format: str="svg", title: str=None, references: list[Union[str, int]]=0, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1):
+    def draw_matches(self, output_file, *, output_format: str="svg", title: str=None, references: list[Union[str, int]]=0, sort: str="similar", mark_width: float=1, scheme: Union[str, dict]="LANL", scale: float=1):
         """ Draw mismatches compared to a reference sequence """
 
         self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
@@ -574,12 +597,37 @@ class MutationPlot:
         self.matches_list = self._mutations.list_matches(references=references)
         self.references = self._mutations.references
 
-        self.scheme: str = scheme
-        self._current_scheme: list = self.match_plot_colors[self.scheme]["references"]
-        self._current_unique_color: str = self.match_plot_colors[self.scheme]["unique"]
-        self._current_multiple_color: str = self.match_plot_colors[self.scheme]["multiple"]
+        if isinstance(scheme, str):
+            self.scheme: str = scheme
+    
+            if self.scheme not in self.match_plot_colors:
+                raise ValueError(f"Scheme {self.scheme} is not a valid scheme")
 
-        self.setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="match", scheme=scheme)
+            self._current_scheme: list = self.match_plot_colors[self.scheme]["references"]
+            self._current_unique_color: str = self.match_plot_colors[self.scheme]["unique"]
+            self._current_multiple_color: str = self.match_plot_colors[self.scheme]["multiple"]
+
+        elif isinstance(scheme, dict):
+            if "references" not in scheme or "unique" not in scheme or "multiple" not in scheme:
+                raise ValueError("Scheme dictionary must contain 'references', 'unique', and 'multiple' keys")
+            
+            if not scheme["references"]:
+                raise ValueError("Scheme dictionary must contain at least one 'reference' color")
+
+            if not scheme["multiple"]:
+                raise ValueError("Scheme dictionary must contain a 'multiple' color")
+            
+            if not scheme["unique"]:
+                raise ValueError("Scheme dictionary must contain a 'unique' color")
+            
+            self._current_scheme: list = scheme["references"]
+            self._current_unique_color: str = scheme["unique"]
+            self._current_multiple_color: str = scheme["multiple"]
+
+        else:
+            raise TypeError("scheme must be a string or a dictionary")
+
+        self._setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="match")
 
         for plot_index, seq_index in enumerate(self.sorted_keys):
             matches = self.matches_list[seq_index]
@@ -625,9 +673,6 @@ class MutationPlot:
 
     def _draw_ruler(self) -> None:
         """ Draw the ruler at the bottom of the plot """
-
-        label_width = stringWidth(str(self._seq_length), self.seq_name_font, self.seq_name_font_size)
-        marks: list = []
 
         if self._seq_length <= 20:
             self._ruler_marks(range(self._seq_length))
