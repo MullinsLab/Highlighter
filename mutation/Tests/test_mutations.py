@@ -215,15 +215,15 @@ class MutationStaticMatchTests(unittest.TestCase):
     def test_get_matches_returns_correct_matches_given_different_sequence_and_reference(self):
         """ get_matches should return a dictionary with the correct keys and values """
 
-        self.assertEqual(AlignInfo.Mutations.get_matches(references='GTGCGGC-', sequence='GTGCGGCT', seq_type='NT'), {7: [0, -1]})
+        self.assertEqual(AlignInfo.Mutations.get_matches(references='GTGCGGC-', sequence='GTGCGGCT', seq_type='NT'), {7: ['Unique']})
 
     def test_get_matches_returns_correct_matches_given_multiple_references(self):
         """ get_matches should return a dictionary with the correct keys and values """
 
-        self.assertEqual(AlignInfo.Mutations.get_matches(references=['GTGCGGC-', 'GTGTGGCT'], sequence='GTGCCGCT', seq_type='NT'), {3: [1], 4: [0, 1, -1], 7: [0]})
+        self.assertEqual(AlignInfo.Mutations.get_matches(references=['GTGCGGC-', 'GTGTGGCT'], sequence='GTGCCGCT', seq_type='NT'), {3: [0], 4: ['Unique'], 7: [1]})
 
-   
-class MutationObjectMismatchTests(unittest.TestCase):
+
+class MutationObjectTests(unittest.TestCase):
     """ Tests that use the mutation object """
 
     def setUp(self):
@@ -252,6 +252,9 @@ class MutationObjectMismatchTests(unittest.TestCase):
 
         with self.assertRaises(IndexError):
             self.short_mutations.list_matches(references=7)
+        
+        with self.assertRaises(ValueError):
+            self.short_mutations.list_matches(references={})
 
     def test_list_mismatches_returns_correct_list(self):
         """ list_mismatches should return a the correct list """
@@ -286,8 +289,12 @@ class MutationObjectMismatchTests(unittest.TestCase):
     def test_list_matches_returns_correct_list(self):
         """ list_matches should return a the correct list """
 
-        result: list = [{}, {}, {0: [1], 7: [0]}, {0: [0], 7: [1]}, {0: [0], 3: [0, 1, -1], 7: [1]}]
+        result: list = [{}, {}, {0: [0], 7: [1]}, {0: [1], 7: [0]}, {0: [1], 3: ['Unique'], 7: [0]}]
         self.assertEqual(self.medium_mutations.list_matches(references=[0, 1]), result)
+
+        result: list = [{}, {}, {0: [0], 7: [1]}, {0: [1], 7: [0]}, {0: [1], 3: ['Unique'], 7: [0]}]
+        self.assertEqual(self.medium_mutations.list_matches(references=[Seq("GTGCGGC_TTTT"), Seq("ATGCGGCTTTTT")]), result)
+
 
 class MutationPlotStaticTests(unittest.TestCase):
     """ Tests that use the static methods of the MutationPlot class """
@@ -345,31 +352,31 @@ class MutationPlotTests(unittest.TestCase):
         return
 
         hashes: dict = {
-            'mutation/Tests/Mutation/zz_nt.bmp': '151197a072cf41782f7a563b9c7835fa',
-            'mutation/Tests/Mutation/zz_nt.eps': '5673fef3bdd0121d0a5a5e9d84746e7b',
-            'mutation/Tests/Mutation/zz_nt.gif': 'ffd504b515e8802be0421accdab17663',
-            'mutation/Tests/Mutation/zz_nt.jpg': '835bb0df30ac33166516835e93d8093d',
-            'mutation/Tests/Mutation/zz_nt.png': 'e9ad40ff6000198b1aa548dd89c8cc4e',
-            'mutation/Tests/Mutation/zz_nt.ps': '5673fef3bdd0121d0a5a5e9d84746e7b',
-            'mutation/Tests/Mutation/zz_nt.svg': '89399497a7a9ccf4a3bed6c5e9f62a28',
-            'mutation/Tests/Mutation/zz_nt.tif': 'd804ca950e045af0c84ff852bcd2c9bb',
-            'mutation/Tests/Mutation/zz_nt.tiff': '1c9aeb61eb111ffd7692a05d22b7bbb8',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-False.svg': '89399497a7a9ccf4a3bed6c5e9f62a28',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-True.svg': '188d09979d348f1c344cf4f93d919ca1',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-False.svg': 'fcd9fdd39d8d6fcd79fc937bf60a48b1',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-True.svg': '195d6bfc06d6db66fc1a9088e8d3ae0a',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-False.svg': 'b6171a7e62b3a3e8df76f47aa12b23fa',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-True.svg': '24e9514794c9c9edada080f79730d5f0',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-False.svg': '82370dba89998bc84c2bf135c44062f5',
-            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-True.svg': '56a88474ce55bc9827186d7ededc8cda',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-False.svg': 'ff3f8bd99185349740f0008ab134451f',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-True.svg': '5458d42538c1d7a5e4eb099c021f9ccc',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-False.svg': 'd3aa4c4244668c5d126d69f0f1574cd9',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-True.svg': '54fa2ee45bbde283efd5682cf2c652e3',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-False.svg': 'b5956a5593fbcefa702fe135b98cfafe',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-True.svg': 'e31a381eebb6d839f86411f89cf40dad',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-False.svg': 'fe8397e108a06237339ba9a776115fe0',
-            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-True.svg': '95bd4713eae9aa6cb90b51c2399ea65f'
+            'mutation/Tests/Mutation/zz_nt.bmp': '794e595bbbf630f026975fe78c673c5b',
+            'mutation/Tests/Mutation/zz_nt.eps': '51623140f62bac22468dbf4d368376ed',
+            'mutation/Tests/Mutation/zz_nt.gif': '7354f9a6ab0b02311f49fb28581104e7',
+            'mutation/Tests/Mutation/zz_nt.jpg': '23be6b021af8c852abe47c794472ac17',
+            'mutation/Tests/Mutation/zz_nt.png': 'b924cbfb797bc921f6a819372e6bf828',
+            'mutation/Tests/Mutation/zz_nt.ps': '51623140f62bac22468dbf4d368376ed',
+            'mutation/Tests/Mutation/zz_nt.svg': '5b7cfbcb5e8891270047dda6f3905071',
+            'mutation/Tests/Mutation/zz_nt.tif': '3c1e29491b068280042e28d834bd4c67',
+            'mutation/Tests/Mutation/zz_nt.tiff': '10a0921d61022e09d4ceefdb0751e7db',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-False.svg': '5b7cfbcb5e8891270047dda6f3905071',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-False_stop-True.svg': 'a2ee70456e7d3f8364e5b4932c80631c',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-False.svg': '376c0782ba075f3ecdd385fe611ffbfe',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-False_gtoa-True_stop-True.svg': '186f94ad80db4598d760267184f4f0af',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-False.svg': '646cddcefe8dcaee2663d35ab078a262',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-False_stop-True.svg': '2ee3200e74a80692c6dc012bff83843d',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-False.svg': 'b61dbf2b41a907dad3cd26d1c08abf93',
+            'mutation/Tests/Mutation/zz_nt_title-False_apobec-True_gtoa-True_stop-True.svg': 'b0d711a4808c9767f937f460f6dd3063',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-False.svg': '09c09b0248483221c41d9b2423efc27c',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-False_stop-True.svg': '55976f9d4bfca8e900b3b48d6ccd627c',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-False.svg': '2aa1974fffe8188285b185849c0f0f62',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-False_gtoa-True_stop-True.svg': '32b015425739b1bd16c71660e234a861',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-False.svg': 'ba690971da851d95a083e4b0ae1196ad',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-False_stop-True.svg': '1e104c1d60a79428752b2eed9560e93a',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-False.svg': 'c1e2436cd6c48825958148196468bf7d',
+            'mutation/Tests/Mutation/zz_nt_title-True_apobec-True_gtoa-True_stop-True.svg': '4583ed3ab37ca31d37f93ae410ab922b'
         }
 
         #new_hashes: dict = {}
@@ -412,19 +419,19 @@ class MutationPlotTests(unittest.TestCase):
         return
 
         hashes: dict = {
-            'mutation/Tests/Mutation/zz_aa.bmp': 'd038e467802cbee4cf57c7c760859626',
-            'mutation/Tests/Mutation/zz_aa.eps': '6f8c9cfd8d68773c8d0e7fda3bf0cf0f',
-            'mutation/Tests/Mutation/zz_aa.gif': '245d88d8ce2c1a3bb23b82da1e24cbe2',
-            'mutation/Tests/Mutation/zz_aa.jpg': 'cb545a04b4e0221bc8ad1179403432cf',
-            'mutation/Tests/Mutation/zz_aa.png': 'b5d55844b1a998198fe5e7ce04169615',
-            'mutation/Tests/Mutation/zz_aa.ps': '6f8c9cfd8d68773c8d0e7fda3bf0cf0f',
-            'mutation/Tests/Mutation/zz_aa.svg': 'b34d86ba82ea5bfcc0ff3a62d16ad0fe',
-            'mutation/Tests/Mutation/zz_aa.tif': '448e0e66e011cf7ac78cefcdfb668db9',
-            'mutation/Tests/Mutation/zz_aa.tiff': 'bee2bcacc14699e4e105fa831c009fe5',
-            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-False.svg': 'b34d86ba82ea5bfcc0ff3a62d16ad0fe',
-            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-True.svg': '94e1e63ae7b90b95eb10a7ffa2de3976',
-            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-False.svg': '271c0739a15cd925bfa67253ca9a380c',
-            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-True.svg': 'd7a4377fe71868b905c39100d9dca91a'
+            'mutation/Tests/Mutation/zz_aa.bmp': '53da1774e6e1650704870b9456438655',
+            'mutation/Tests/Mutation/zz_aa.eps': '630ca9d5be700e02d656577220d1644e',
+            'mutation/Tests/Mutation/zz_aa.gif': 'b3d8d8e621a42c58b8bb4d3bc4496be3',
+            'mutation/Tests/Mutation/zz_aa.jpg': '8df944cbb6206093d752d526e80dcdbf',
+            'mutation/Tests/Mutation/zz_aa.png': '6ec90f77f3406c67b6c046bd2b9cebe0',
+            'mutation/Tests/Mutation/zz_aa.ps': '630ca9d5be700e02d656577220d1644e',
+            'mutation/Tests/Mutation/zz_aa.svg': '74721078610e8ea0abc788be9b933673',
+            'mutation/Tests/Mutation/zz_aa.tif': '1fe9af0b23b2e3a042d1791da652a90e',
+            'mutation/Tests/Mutation/zz_aa.tiff': 'fc402e450fd14e6c19a1c108a8e7bf5d',
+            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-False.svg': '74721078610e8ea0abc788be9b933673',
+            'mutation/Tests/Mutation/zz_aa_title-False_glycosylation-True.svg': 'e0b4e7cb74b605dfdefba97c547f5eec',
+            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-False.svg': 'e8a9b91b480b6c87cb4d7b44ad0abfe5',
+            'mutation/Tests/Mutation/zz_aa_title-True_glycosylation-True.svg': '37d21877a6d65ce214d89fd220e21401'
         }
 
         #new_hashes: dict = {}

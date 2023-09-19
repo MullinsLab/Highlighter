@@ -145,7 +145,7 @@ class Mutations:
         
         return mismatches
     
-    def list_matches(self, *, references: tuple[Union[int, str]]=0) -> list[dict[str: list]]:
+    def list_matches(self, *, references=0) -> list[dict[str: list]]:
         """ Get matches from a sequence and a reference sequence """
 
         matches: list[dict[str: list]] = []
@@ -166,20 +166,40 @@ class Mutations:
                 
                 self.references.append(reference)
 
+            elif isinstance(reference, Seq):
+                self.references.append(reference)
+
+            elif isinstance(reference, dict):
+                if "sequence" not in reference or "color" not in reference:
+                    raise ValueError("Reference dictionaries must contain 'sequence' and 'color' keys")
+
             else:
                 raise TypeError(f"Expected reference to be an int or str, got {type(reference)}")
             
-            reference_objects.append(self.alignment[self.references[-1]])
+            if isinstance(reference, Seq):
+                reference_objects.append(str(reference))
+            else:
+                reference_objects.append(self.alignment[self.references[-1]])
 
-        for sequence in self.alignment:
-            matches.append(self.get_matches(sequence=sequence, references=reference_objects, seq_type=self.seq_type))
+        for sequence_index, sequence in enumerate(self.alignment):
+            if sequence_index in self.references:
+                matches.append({})
+            else:
+                matches.append(self.get_matches(sequence=sequence, references=reference_objects, seq_type=self.seq_type))
 
         return matches
     
     @staticmethod
     def get_matches(*, sequence: Union[str, Seq, SeqRecord], references: Union[list[str, Seq, SeqRecord], str, Seq, SeqRecord], seq_type: str=None) -> dict[int: list]:
         """ Get matches of a sequence to one or more reference sequences
-        returns a dictionary of matches where the key is the position of the match and the value is a list of types of matches """
+        returns a dictionary of matches where the key is the position of the match and the value is a list of types of matches 
+        
+        references can be:
+        int: index of a sequence in the alignment
+        str: id of a sequence in the alignment
+        Seq: a sequence object 
+        
+        or a list of the same"""
         
         if seq_type not in ("NT", "AA"):
             raise ValueError("type must be provided (either 'NT' or 'AA')")
@@ -266,11 +286,6 @@ class Mutations:
                         matched[codes[0]] = []
                     
                     matched[codes[0]].append(base+1)
-
-            if sequence.id == "696": 
-                print(matched)
-                print(matches[sequence_index])
-                print(references)
 
             if sequence_index in self.references:
                 output += f"{sequence.id} (R{self.references.index(sequence_index)+1})\n"
@@ -753,7 +768,7 @@ class MutationPlot:
             if sequence.id == id:
                 return index
         
-        return None
+        raise IndexError(f"Sequence with id '{id}' not found")
     
     def _indexes_by_tree_order(self) -> list[int]:
         """ Get the indexes of the sequences in the order they appear in the tree """
