@@ -173,9 +173,8 @@ class Highlighter:
 
             output += "\n"
 
-        # with open(output_file, mode="wt") as file:
-        #     file.write(output)
-        print(output)
+        with open(output_file, mode="wt") as file:
+            file.write(output)
 
     def list_matches(self, *, references=0) -> list[dict[str: list]]:
         """ Get matches from a sequence and a reference sequence """
