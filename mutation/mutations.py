@@ -148,6 +148,35 @@ class Mutations:
         
         return mismatches
     
+    def export_mismatches(self, output_file, *, references: Union[int, str]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, codon_offset: int=0) -> None:
+        """ Export mismatches to a .txt file"""
+
+        output: str = ""
+        mismatches = self.list_mismatches(references=references, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=codon_offset)
+
+        for sequence_index, sequence in enumerate(self.alignment):
+            working: dict = {}
+
+            for base, codes in mismatches[sequence_index].items():
+                for code in codes:
+                    if code not in working:
+                        working[code] = []
+                    
+                    working[code].append(base+1)
+            
+            output += f"{sequence.id}\n"
+
+            for code in sorted(working, key=lambda x: (len(x), x)):
+                output += f"{code} ["
+                output += " ".join([str(thing) for thing in working[code]])
+                output += "]\n"
+
+            output += "\n"
+
+        # with open(output_file, mode="wt") as file:
+        #     file.write(output)
+        print(output)
+
     def list_matches(self, *, references=0) -> list[dict[str: list]]:
         """ Get matches from a sequence and a reference sequence """
 
@@ -247,13 +276,13 @@ class Mutations:
 
         matches: dict = {}
         
-        if sequence in references:
-            return matches
+        # if sequence in references:
+        #     return matches
 
         for base_index in range(len(sequence)):
             matches[base_index] = []
             for reference_index, reference in enumerate(references):
-                if reference[base_index] == sequence[base_index]:
+                if reference[base_index] == sequence[base_index] or reference[base_index] == "X":
                     matches[base_index].append(reference_index)
 
             if not matches[base_index]:
@@ -336,7 +365,7 @@ from Bio.Align import AlignInfo
 class MutationPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, tree: Union[str, object]=None, plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, mark_reference: bool=True, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
+    def __init__(self, alignment, *, type: str=None, tree: Union[str, object]=None, plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, plot_label_gap: float=(inch/4), mark_reference: bool=True, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
@@ -364,6 +393,7 @@ class MutationPlot:
         self.bottom_margin: float = bottom_margin
         self.left_margin: float = left_margin
         self.right_margin: float = right_margin
+        self.plot_label_gap: float = plot_label_gap
 
         self.title_font: str = title_font
         self.title_font_size: int = title_font_size
@@ -438,9 +468,10 @@ class MutationPlot:
             }
         }
 
-    def _setup_drawing(self, *, plot_type: str, output_format: str="svg", title: str=None, sort: str="similar", mark_width: float=1, scale: float=1):
+    def _setup_drawing(self, *, plot_type: str, output_format: str="svg", title: str=None, sort: str="similar", mark_width: float=1, scale: float=1, sequence_labels: bool=True):
         """ Setus up the drawing """
         
+        self.plot_type: str = plot_type
         self.output_format: str = output_format
 
         self.title: str = title
@@ -451,8 +482,8 @@ class MutationPlot:
 
         self._plot_floor: float = self.bottom_margin + self._ruler_height
 
-        self._seq_name_width: float = self._max_seq_name_width
-        self._width: float = self.left_margin + self.plot_width + (inch/4) + self._seq_name_width + self.right_margin
+        self._seq_name_width: float = self._max_seq_name_width if sequence_labels else 0
+        self._width: float = self.left_margin + self.plot_width + self.plot_label_gap + self._seq_name_width + self.right_margin
         
         self._height: float = len(self.alignment) * (self._seq_height + self.seq_gap) + self.top_margin + self.bottom_margin + self._title_height + self._ruler_height
 
@@ -481,22 +512,23 @@ class MutationPlot:
         for plot_index, seq_index in enumerate(self.sorted_keys):
 
             # Add label for sequence
-            id = self.alignment[seq_index].id
-            if self.mark_reference:
-                if isinstance(self._mutations.references, int):
-                    if seq_index == self._mutations.references:
-                        id += " (r)"
-                elif seq_index in self._mutations.references:
-                    id += f" (r{self._mutations.references.index(seq_index)+1})"
-                
-            x: float = self.left_margin + self.plot_width + (inch/4)
-            y: float = ((self._seq_count-(plot_index + .75)) * (self._seq_height + self.seq_gap))  + self.seq_gap + self._plot_floor
-            sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
-            self.drawing.add(sequence_str, id)
-
-            color: Color = None
+            if sequence_labels:
+                id = self.alignment[seq_index].id
+                if self.mark_reference:
+                    if isinstance(self._mutations.references, int):
+                        if seq_index == self._mutations.references:
+                            id += " (r)"
+                    elif seq_index in self._mutations.references:
+                        id += f" (r{self._mutations.references.index(seq_index)+1})"
+                    
+                x: float = self.left_margin + self.plot_width + self.plot_label_gap #(inch/4)
+                y: float = ((self._seq_count-(plot_index + .75)) * (self._seq_height + self.seq_gap))  + self.seq_gap + self._plot_floor
+                sequence_str: String = String(x, y, id, fontName="Helvetica", fontSize=self.seq_name_font_size)
+                self.drawing.add(sequence_str, id)
 
             # Add base line for sequence
+            color: Color = None
+
             if plot_type == "match":
                 if seq_index in self._mutations.references:
                     color = self._hex_to_color(self._current_scheme[self._mutations.references.index(seq_index)])
@@ -527,7 +559,7 @@ class MutationPlot:
             sequence_baseline: Line = Line(x1, y, x2, y, strokeColor=color)
             self.drawing.add(sequence_baseline)
     
-    def draw_mismatches(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1):
+    def draw_mismatches(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1, sequence_labels: bool=True):
         """ Draw mismatches compared to a reference sequence """
 
         self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
@@ -535,7 +567,7 @@ class MutationPlot:
         self.matches_list = self._mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
         self.references = self._mutations.references
 
-        self._setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="mismatch")
+        self._setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="mismatch", sequence_labels=sequence_labels)
 
         self.scheme: str = scheme
         self._current_scheme: dict = self.mismatch_plot_colors[self.type][self.scheme] if self.scheme in self.mismatch_plot_colors[self.type] else self.mismatch_plot_colors[self.type]["LANL"]
@@ -589,7 +621,7 @@ class MutationPlot:
 
                     self.draw_diamond(x, y, color="#0000FF")
 
-    def draw_matches(self, output_file, *, output_format: str="svg", title: str=None, references: list[Union[str, int]]=0, sort: str="similar", mark_width: float=1, scheme: Union[str, dict]="LANL", scale: float=1):
+    def draw_matches(self, output_file, *, output_format: str="svg", title: str=None, references: list[Union[str, int]]=0, sort: str="similar", mark_width: float=1, scheme: Union[str, dict]="LANL", scale: float=1, sequence_labels: bool=True):
         """ Draw mismatches compared to a reference sequence """
 
         self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
@@ -627,7 +659,7 @@ class MutationPlot:
         else:
             raise TypeError("scheme must be a string or a dictionary")
 
-        self._setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="match")
+        self._setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="match", sequence_labels=sequence_labels)
 
         for plot_index, seq_index in enumerate(self.sorted_keys):
             matches = self.matches_list[seq_index]
@@ -770,9 +802,13 @@ class MutationPlot:
         """ Get the width of the longest sequence name """
 
         max_width: float = 0
+        if self.plot_type == "match":
+            reference_tag: str = " (r10)"
+        elif self.plot_type == "mismatch":
+            reference_tag: str = " (r)"
 
         for sequence in self.alignment:
-            width: float = stringWidth(f"{sequence.id} (r10)", self.seq_name_font, self.seq_name_font_size)
+            width: float = stringWidth(f"{sequence.id} {reference_tag}", self.seq_name_font, self.seq_name_font_size)
             if width > max_width:
                 max_width = width
         
