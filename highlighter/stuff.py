@@ -1,4 +1,4 @@
-import mutations
+import highlighter.highlighter as highlighter
 
 import Bio
 from Bio import AlignIO, Phylo
@@ -110,9 +110,9 @@ if False:
 
 if False:
     align = AlignIO.read('mutation/Tests/Mutation/test.fasta', 'fasta')
-    mutations = AlignInfo.Mutations(align, type="NT")
-    print(mutations.list_mutations(apobec=True, stop_codons=True))
-    print(f"Is stop in result: {'Stop' in str(mutations.list_mutations(stop_codons=True))}")
+    highlighter = AlignInfo.Mutations(align, type="NT")
+    print(highlighter.list_mutations(apobec=True, stop_codons=True))
+    print(f"Is stop in result: {'Stop' in str(highlighter.list_mutations(stop_codons=True))}")
     exit()
 
 if False:
@@ -130,7 +130,7 @@ if False:
 if False:
     align = AlignIO.read('mutation/Tests/Mutation/highlighter.fasta', 'fasta')
     # align = AlignIO.read('mutation/Tests/Mutation/short_test.fasta', 'fasta')
-    mutations = AlignInfo.Mutations(align)
+    highlighter = AlignInfo.Mutations(align)
 
     mutation_plot = MutationPlot(align, title="Mismatches compared to reference")
     mutation_plot.draw_mismatches("test.svg", apobec=True, g_to_a=True, narrow_markers=True)

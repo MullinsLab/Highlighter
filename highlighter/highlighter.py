@@ -7,7 +7,7 @@ from Bio.Align import AlignInfo
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 
-class Mutations:
+class Highlighter:
     """ Get mutation info from an alignment """
 
     def __init__(self, alignment, *, seq_type: str=None, codon_offset: int=0):
@@ -77,7 +77,7 @@ class Mutations:
         if len(sequence) != len(references):
             raise ValueError("Reference and sequence must be the same length")
         
-        return Mutations.get_mismatches_from_str(sequence=sequence, references=references, seq_type=seq_type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=codon_offset)
+        return Highlighter.get_mismatches_from_str(sequence=sequence, references=references, seq_type=seq_type, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=codon_offset)
     
     @staticmethod
     @cache
@@ -263,7 +263,7 @@ class Mutations:
             
             new_references.append(reference)
 
-        return Mutations.get_matches_from_str(sequence=sequence, references=tuple(new_references), seq_type=seq_type)
+        return Highlighter.get_matches_from_str(sequence=sequence, references=tuple(new_references), seq_type=seq_type)
 
     @staticmethod
     @cache
@@ -346,7 +346,7 @@ class Mutations:
         with open(output_file, mode="wt") as file:
             file.write(output)
     
-AlignInfo.Mutations = Mutations
+AlignInfo.Highlighter = Highlighter
 
 
 from reportlab.lib import colors
@@ -362,7 +362,7 @@ from Bio.Graphics import _write
 from Bio.Align import AlignInfo
 
 
-class MutationPlot:
+class HighlighterPlot:
     """ Create and output a mutation plot """
 
     def __init__(self, alignment, *, type: str=None, tree: Union[str, object]=None, plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, plot_label_gap: float=(inch/4), mark_reference: bool=True, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
@@ -562,7 +562,7 @@ class MutationPlot:
     def draw_mismatches(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1, sequence_labels: bool=True):
         """ Draw mismatches compared to a reference sequence """
 
-        self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
+        self._mutations = AlignInfo.Highlighter(self.alignment, seq_type=self.type)
         
         self.matches_list = self._mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
         self.references = self._mutations.references
@@ -624,7 +624,7 @@ class MutationPlot:
     def draw_matches(self, output_file, *, output_format: str="svg", title: str=None, references: list[Union[str, int]]=0, sort: str="similar", mark_width: float=1, scheme: Union[str, dict]="LANL", scale: float=1, sequence_labels: bool=True):
         """ Draw mismatches compared to a reference sequence """
 
-        self._mutations = AlignInfo.Mutations(self.alignment, seq_type=self.type)
+        self._mutations = AlignInfo.Highlighter(self.alignment, seq_type=self.type)
         
         self.matches_list = self._mutations.list_matches(references=references)
         self.references = self._mutations.references
@@ -899,7 +899,7 @@ class MutationPlot:
                     
         return "NT"
 
-Graphics.MutationPlot = MutationPlot
+Graphics.HighlighterPlot = HighlighterPlot
 
 
 from Bio import SeqUtils
