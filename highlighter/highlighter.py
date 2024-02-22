@@ -17,7 +17,7 @@ class Highlighter:
         self.codon_offet: int=codon_offset % 3
 
         if seq_type not in ("NT", "AA"):
-            raise ValueError("type must be provided (either 'NT' or 'AA')")
+            raise ValueError(f"type must be provided (either 'NT' or 'AA', got: '{seq_type}')")
         else:
             self.seq_type = seq_type
         
@@ -364,16 +364,16 @@ from Bio.Align import AlignInfo
 class HighlighterPlot:
     """ Create and output a mutation plot """
 
-    def __init__(self, alignment, *, type: str=None, tree: Union[str, object]=None, plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, plot_label_gap: float=(inch/4), mark_reference: bool=True, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
+    def __init__(self, alignment, *, seq_type: str=None, tree: Union[str, object]=None, plot_width: int = 4*inch, seq_name_font: str="Helvetica", seq_name_font_size: int=8, seq_gap: int=None, left_margin: float=.25*inch, top_margin: float=.25*inch, bottom_margin: float=0, right_margin: float=0, plot_label_gap: float=(inch/4), mark_reference: bool=True, title_font="Helvetica", title_font_size: int=12, ruler: bool=True, ruler_font: str="Helvetica", ruler_font_size: int=6, ruler_major_ticks: int=10, ruler_minor_ticks=3, codon_offset: int=0):
         """ Initialize the MutationPlot object """
 
         self.alignment = alignment
         self.codon_offset = codon_offset % 3
 
-        if type not in ("NT", "AA"):
-            self.type = self.guess_alignment_type(alignment)
+        if seq_type not in ("NT", "AA"):
+            self.seq_type = self.guess_alignment_type(alignment)
         else:
-            self.type = type
+            self.seq_type = seq_type
 
         if tree is not None:
             if isinstance(tree, Bio.Phylo.BaseTree.Tree):
@@ -546,7 +546,6 @@ class HighlighterPlot:
                     sequence = sequence.replace("\n", "")
                     
                     if sequence.replace in self._mutations.references:
-                        print("got sequence")
                         color = self._hex_to_color(self._current_scheme[self._mutations.references.index(sequence)])
 
             if not color:
@@ -561,7 +560,7 @@ class HighlighterPlot:
     def draw_mismatches(self, output_file, *, output_format: str="svg", title: str=None, reference: Union[str, int]=0, apobec: bool=False, g_to_a: bool=False, stop_codons: bool=False, glycosylation: bool=False, sort: str="similar", mark_width: float=1, scheme: str="LANL", scale: float=1, sequence_labels: bool=True):
         """ Draw mismatches compared to a reference sequence """
 
-        self._mutations = AlignInfo.Highlighter(self.alignment, seq_type=self.type)
+        self._mutations = AlignInfo.Highlighter(self.alignment, seq_type=self.seq_type)
         
         self.matches_list = self._mutations.list_mismatches(references=reference, apobec=apobec, g_to_a=g_to_a, stop_codons=stop_codons, glycosylation=glycosylation, codon_offset=self.codon_offset)
         self.references = self._mutations.references
@@ -569,7 +568,7 @@ class HighlighterPlot:
         self._setup_drawing(output_format=output_format, title=title, sort=sort, mark_width=mark_width, scale=scale, plot_type="mismatch", sequence_labels=sequence_labels)
 
         self.scheme: str = scheme
-        self._current_scheme: dict = self.mismatch_plot_colors[self.type][self.scheme] if self.scheme in self.mismatch_plot_colors[self.type] else self.mismatch_plot_colors[self.type]["LANL"]
+        self._current_scheme: dict = self.mismatch_plot_colors[self.seq_type][self.scheme] if self.scheme in self.mismatch_plot_colors[self.seq_type] else self.mismatch_plot_colors[self.seq_type]["LANL"]
 
         self._apobec: bool = apobec
         self._g_to_a: bool = g_to_a
@@ -582,39 +581,51 @@ class HighlighterPlot:
 
         return _write(self.drawing, output_file, self.output_format, dpi=288*self.scale)
 
-    def _draw_marks_mismatch(self, plot_index: int, matches: dict[int: list], is_reference: bool=False) -> None:
+    def _draw_marks_mismatch(self, plot_index: int, mismatches: dict[int: list], is_reference: bool=False) -> None:
         """ Draw marks for a mismatch sequence """
 
-        for base, match_item in matches.items():
-            for code in match_item:
+        already_processed: list = []
+        for base, mismatch_item in mismatches.items():
+            if base in already_processed:
+                continue
+
+            for code in mismatch_item:
                 if code in self._current_scheme:
+                    width: int = 1
                     color: Color = self._hex_to_color(self._current_scheme[code])
-                    self.drawing.add(self._base_mark(plot_index, base, color))
+
+                    check_base: int = base+1
+                    while check_base in mismatches and code in mismatches[check_base]:
+                        width += 1
+                        already_processed.append(check_base)
+                        check_base += 1
+
+                    self.drawing.add(self._base_mark(plot_index, base, color, width=width))
         
         # Symboloic markers need to be drawn second so they are on top of the rectangles
-        for base, match_item in matches.items():
+        for base, mismatch_item in mismatches.items():
             x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
             y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
                 
-            if "APOBEC" in match_item:
+            if "APOBEC" in mismatch_item:
                 self.draw_circle(x, y)
                 
-            elif "G->A mutation" in match_item:
+            elif "G->A mutation" in mismatch_item:
                 self.draw_diamond(x, y)
 
-            elif "Glycosylation" in match_item:
+            elif "Glycosylation" in mismatch_item:
                 if is_reference:
                     self.draw_circle(x, y)
                 else:
                     if "Glycosylation" not in self.matches_list[self.references].get(base, {}):
                         self.draw_diamond(x, y, filled=True)
 
-            elif "Stop codon" in match_item:
+            elif "Stop codon" in mismatch_item:
                 self.draw_diamond(x, y, color="#0000FF")
 
-        if self.type == "AA" and self._glycosylation:
-            for base, match_item in self.matches_list[self.references].items():
-                if "Glycosylation" in match_item and "Glycosylation" not in matches.get(base, {}):
+        if self.seq_type == "AA" and self._glycosylation:
+            for base, mismatch_item in self.matches_list[self.references].items():
+                if "Glycosylation" in mismatch_item and "Glycosylation" not in mismatches.get(base, {}):
                     x: float = self.left_margin + self._base_left(base) + ((self._base_left(base+1)-self._base_left(base))/2)
                     y: float = (self._seq_count-(plot_index + .5)) * (self._seq_height + self.seq_gap) + self.seq_gap + self._plot_floor
 
@@ -623,7 +634,7 @@ class HighlighterPlot:
     def draw_matches(self, output_file, *, output_format: str="svg", title: str=None, references: list[Union[str, int]]=0, sort: str="similar", mark_width: float=1, scheme: Union[str, dict]="LANL", scale: float=1, sequence_labels: bool=True):
         """ Draw mismatches compared to a reference sequence """
 
-        self._mutations = AlignInfo.Highlighter(self.alignment, seq_type=self.type)
+        self._mutations = AlignInfo.Highlighter(self.alignment, seq_type=self.seq_type)
         
         self.matches_list = self._mutations.list_matches(references=references)
         self.references = self._mutations.references
@@ -645,10 +656,10 @@ class HighlighterPlot:
             if not scheme["references"]:
                 raise ValueError("Scheme dictionary must contain at least one 'reference' color")
 
-            if not scheme["multiple"]:
+            if "multiple" not in scheme or (scheme["multiple"] is not None and not scheme["multiple"]):
                 raise ValueError("Scheme dictionary must contain a 'multiple' color")
             
-            if not scheme["unique"]:
+            if "unique" not in scheme or (scheme["unique"] is not None and not scheme["unique"]):
                 raise ValueError("Scheme dictionary must contain a 'unique' color")
             
             self._current_scheme: list = scheme["references"]
@@ -669,24 +680,60 @@ class HighlighterPlot:
     def _draw_marks_match(self, plot_index: int, matches: dict[int, list], is_reference: bool) -> None:
         """ Draw the marks for a match sequence """
 
+        already_processed: dict[list] = {"Unique": [], "Multiple": [], "Single": []}
         for base, match_item in matches.items():
+            check_base: int = base+1
+            width: int = 1
+
             if "Unique" in match_item:
-                color: Color = self._hex_to_color(self._current_unique_color)
-                self.drawing.add(self._base_mark(plot_index, base, color))
+                if base in already_processed["Unique"]:
+                    continue
+
+                if self._current_unique_color is not None:
+                    color: Color = self._hex_to_color(self._current_unique_color)
+
+                    while check_base in matches and "Unique" in matches[check_base]:
+                        width += 1
+                        already_processed["Unique"].append(check_base)
+                        check_base += 1
+
+                    self.drawing.add(self._base_mark(plot_index, base, color, width=width))
 
             elif len(match_item) > 1:
-                color: Color = self._hex_to_color(self._current_multiple_color)
-                self.drawing.add(self._base_mark(plot_index, base, color))
+
+                if base in already_processed["Multiple"]:
+                    continue
+
+                if self._current_multiple_color is not None:
+                    color: Color = self._hex_to_color(self._current_multiple_color)
+
+                    while check_base in matches and len(matches[check_base]) > 1:
+                        width += 1
+                        already_processed["Multiple"].append(check_base)
+                        check_base += 1
+
+                    self.drawing.add(self._base_mark(plot_index, base, color, width=width))
 
             else:
-                for code in match_item:
-                    color: Color = self._hex_to_color(self._current_scheme[code])
-                    self.drawing.add(self._base_mark(plot_index, base, color))
+                if base in already_processed["Single"]:
+                    continue
 
-    def _base_mark(self, plot_index, base, color):
+                for code in match_item:
+                    if self._current_scheme[code] is not None:
+                        color: Color = self._hex_to_color(self._current_scheme[code])
+
+                        while check_base in matches and code in matches[check_base]:
+                            width += 1
+                            already_processed["Single"].append(check_base)
+                            check_base += 1
+
+                        self.drawing.add(self._base_mark(plot_index, base, color, width=width))
+
+    def _base_mark(self, plot_index, base, color, width: int=1) -> Rect:
         """ Returns a mark for a particular base """
+
         x1: float = self.left_margin + self._base_left(base)
-        x2: float = self.left_margin + self._base_left(base+self.mark_width)
+        x2: float = self.left_margin + self._base_left(base + (width - 1) + self.mark_width )
 
         y1: float = ((self._seq_count-plot_index) * (self._seq_height + self.seq_gap)) + (self.seq_gap/2) + self._plot_floor
         y2: float = ((self._seq_count-(plot_index+1)) * (self._seq_height + self.seq_gap)) + self.seq_gap + self._plot_floor
