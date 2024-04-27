@@ -8,3 +8,6 @@ __pycache__/
 *.svg
 *.txt
 *.png
+
+# Include everything in /media
+!/media/*
